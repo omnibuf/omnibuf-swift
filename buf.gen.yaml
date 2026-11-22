@@ -1,0 +1,5 @@
+version: v2
+plugins:
+  - local: ./.build/release/protoc-gen-omnibuf-swift
+    out: Sources/conformance-swift/Generated
+    strategy: all

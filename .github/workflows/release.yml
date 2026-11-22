@@ -1,0 +1,100 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify Release
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Swift
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.0"
+
+      - name: Install tools via mise
+        uses: jdx/mise-action@v2
+        with:
+          install: true
+
+      - name: Install conformance-runner
+        run: |
+          mise use -g go@1.25
+          GOBIN="$HOME/.local/bin" mise exec -- go install github.com/omnibuf/omnibuf-go/cmd/conformance-runner@71dad83aadd7dc65401d662521d34cfaeb1011ab
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Run tests and conformance
+        run: |
+          swift test
+          just conformance
+
+  build-plugin:
+    name: Build protoc-gen-omnibuf-swift (${{ matrix.target }})
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            target: darwin-arm64
+          - os: ubuntu-24.04
+            target: linux-amd64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Swift (Linux)
+        if: runner.os == 'Linux'
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.0"
+
+      - name: Build protoc-gen-omnibuf-swift
+        run: swift build -c release --product protoc-gen-omnibuf-swift
+
+      - name: Package release archive
+        run: |
+          TAG="${GITHUB_REF_NAME:-v0.1.0}"
+          ARCHIVE="protoc-gen-omnibuf-swift-${TAG}-${{ matrix.target }}.tar.gz"
+          tar -czf "${ARCHIVE}" -C .build/release protoc-gen-omnibuf-swift
+          shasum -a 256 "${ARCHIVE}" > "${ARCHIVE}.sha256"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: protoc-gen-omnibuf-swift-${{ matrix.target }}
+          path: |
+            protoc-gen-omnibuf-swift-*.tar.gz
+            protoc-gen-omnibuf-swift-*.tar.gz.sha256
+
+  release:
+    name: Publish GitHub Release
+    needs: build-plugin
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: dist/*

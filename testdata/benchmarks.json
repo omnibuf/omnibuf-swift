@@ -1,0 +1,180 @@
+{
+  "arch" : "arm64",
+  "categories" : [
+    {
+      "id" : "encode",
+      "results" : [
+        {
+          "baseline" : true,
+          "highlight" : true,
+          "name" : "OmniBuf (Generated)",
+          "nsPerOp" : 355,
+          "opsPerSec" : 2817489,
+          "wireBytes" : 365
+        },
+        {
+          "name" : "SwiftProtobuf",
+          "nsPerOp" : 1341,
+          "opsPerSec" : 745780,
+          "wireBytes" : 341
+        },
+        {
+          "highlight" : true,
+          "name" : "OmniBuf (Struct Schema)",
+          "nsPerOp" : 2581,
+          "opsPerSec" : 387374,
+          "wireBytes" : 365
+        },
+        {
+          "name" : "JSONEncoder",
+          "nsPerOp" : 18525,
+          "opsPerSec" : 53982,
+          "wireBytes" : 791
+        }
+      ],
+      "title" : "Full Message Encode Speed",
+      "unit" : "ns"
+    },
+    {
+      "id" : "decode",
+      "results" : [
+        {
+          "baseline" : true,
+          "highlight" : true,
+          "name" : "OmniBuf (Generated)",
+          "nsPerOp" : 980,
+          "opsPerSec" : 1020684
+        },
+        {
+          "name" : "SwiftProtobuf",
+          "nsPerOp" : 2214,
+          "opsPerSec" : 451644
+        },
+        {
+          "highlight" : true,
+          "name" : "OmniBuf (Struct Schema)",
+          "nsPerOp" : 5762,
+          "opsPerSec" : 173564
+        },
+        {
+          "name" : "JSONDecoder",
+          "nsPerOp" : 21182,
+          "opsPerSec" : 47210
+        }
+      ],
+      "title" : "Full Message Decode Speed",
+      "unit" : "ns"
+    },
+    {
+      "id" : "lookup_city",
+      "results" : [
+        {
+          "baseline" : true,
+          "highlight" : true,
+          "name" : "OmniBuf (Generated)",
+          "nsPerOp" : 146,
+          "opsPerSec" : 6860527
+        },
+        {
+          "name" : "SwiftProtobuf",
+          "nsPerOp" : 2278,
+          "opsPerSec" : 438971
+        },
+        {
+          "name" : "JSONDecoder",
+          "nsPerOp" : 20555,
+          "opsPerSec" : 48650
+        }
+      ],
+      "title" : "Read a Single Nested Field",
+      "unit" : "ns"
+    },
+    {
+      "id" : "mutate_sequence",
+      "results" : [
+        {
+          "baseline" : true,
+          "highlight" : true,
+          "name" : "OmniBuf (Generated)",
+          "nsPerOp" : 513,
+          "opsPerSec" : 1949458
+        },
+        {
+          "name" : "SwiftProtobuf",
+          "nsPerOp" : 3702,
+          "opsPerSec" : 270112
+        },
+        {
+          "name" : "JSONEncoder \/ JSONDecoder",
+          "nsPerOp" : 39939,
+          "opsPerSec" : 25038
+        }
+      ],
+      "title" : "Selective Single-Field Mutation",
+      "unit" : "ns"
+    },
+    {
+      "id" : "encode_nested_shift",
+      "results" : [
+        {
+          "baseline" : true,
+          "highlight" : true,
+          "name" : "OmniBuf (Generated)",
+          "nsPerOp" : 2098,
+          "opsPerSec" : 476570,
+          "wireBytes" : 39255
+        },
+        {
+          "name" : "SwiftProtobuf",
+          "nsPerOp" : 2908,
+          "opsPerSec" : 343842,
+          "wireBytes" : 39227
+        },
+        {
+          "highlight" : true,
+          "name" : "OmniBuf (Struct Schema)",
+          "nsPerOp" : 6600,
+          "opsPerSec" : 151508,
+          "wireBytes" : 39255
+        },
+        {
+          "name" : "JSONEncoder",
+          "nsPerOp" : 117210,
+          "opsPerSec" : 8532,
+          "wireBytes" : 39669
+        }
+      ],
+      "title" : "Large Embedded Message Encode",
+      "unit" : "ns"
+    },
+    {
+      "id" : "mutate_embedded_grow",
+      "results" : [
+        {
+          "baseline" : true,
+          "highlight" : true,
+          "name" : "OmniBuf (Generated)",
+          "nsPerOp" : 1549,
+          "opsPerSec" : 645602
+        },
+        {
+          "name" : "SwiftProtobuf",
+          "nsPerOp" : 17327,
+          "opsPerSec" : 57712
+        },
+        {
+          "name" : "JSONEncoder \/ JSONDecoder",
+          "nsPerOp" : 187505,
+          "opsPerSec" : 5333
+        }
+      ],
+      "title" : "Embedded Message Growth",
+      "unit" : "ns"
+    }
+  ],
+  "cpu" : "Apple M1 Pro",
+  "language" : "swift",
+  "platform" : "darwin",
+  "runtime" : "Swift 6.3.2",
+  "workload" : "PeerUpdate"
+}

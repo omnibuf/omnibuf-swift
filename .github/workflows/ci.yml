@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Build, Test & Conformance (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Swift (Linux)
+        if: runner.os == 'Linux'
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.0"
+
+      - name: Install tools via mise
+        uses: jdx/mise-action@v2
+        with:
+          install: true
+
+      - name: Install conformance-runner
+        run: |
+          mise use -g go@1.25
+          GOBIN="$HOME/.local/bin" mise exec -- go install github.com/omnibuf/omnibuf-go/cmd/conformance-runner@71dad83aadd7dc65401d662521d34cfaeb1011ab
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Build release
+        run: swift build -c release
+
+      - name: Run Swift tests
+        run: swift test
+
+      - name: Run conformance suite
+        run: just conformance
+
+      - name: Lint Protobuf schemas
+        run: buf lint
