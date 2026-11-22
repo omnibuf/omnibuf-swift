@@ -37,7 +37,7 @@ jobs:
             ${{ runner.os }}-swift-6.2-
 
       - name: Install tools via mise
-        uses: jdx/mise-action@v2
+        uses: jdx/mise-action@v5
         with:
           install: true
 
