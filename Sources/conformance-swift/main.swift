@@ -531,6 +531,11 @@ private func handleAnnotatedStructTier(_ req: IPCRequest) -> IPCResponse {
 
 // MARK: - Main Frame Loop
 
+private func writeStderr(_ message: String) {
+    let stderrFD = FileHandle.standardError.fileDescriptor
+    _ = writeExact(Array(message.utf8), to: stderrFD)
+}
+
 func runConformanceLoop() {
     let stdinFD = FileHandle.standardInput.fileDescriptor
     let stdoutFD = FileHandle.standardOutput.fileDescriptor
@@ -544,7 +549,7 @@ func runConformanceLoop() {
             | (UInt32(lenBytes[2]) << 16)
             | (UInt32(lenBytes[3]) << 24))
         if size > maxFrameBytes {
-            fputs("conformance-swift: frame size \(size) exceeds limit\n", stderr)
+            writeStderr("conformance-swift: frame size \(size) exceeds limit\n")
             exit(1)
         }
         let payload: [UInt8]
@@ -552,7 +557,7 @@ func runConformanceLoop() {
             payload = []
         } else {
             guard let p = readExact(size, from: stdinFD) else {
-                fputs("conformance-swift: unexpected EOF reading frame payload\n", stderr)
+                writeStderr("conformance-swift: unexpected EOF reading frame payload\n")
                 exit(1)
             }
             payload = p
@@ -562,7 +567,7 @@ func runConformanceLoop() {
         do {
             req = try IPCRequest.decoded(from: payload)
         } catch {
-            fputs("conformance-swift: failed to decode ConformanceRequest: \(error)\n", stderr)
+            writeStderr("conformance-swift: failed to decode ConformanceRequest: \(error)\n")
             exit(1)
         }
 
@@ -584,7 +589,7 @@ func runConformanceLoop() {
         do {
             outBytes = try resp.encodeOmniBuf()
         } catch {
-            fputs("conformance-swift: failed to encode ConformanceResponse: \(error)\n", stderr)
+            writeStderr("conformance-swift: failed to encode ConformanceResponse: \(error)\n")
             exit(1)
         }
 
@@ -596,7 +601,7 @@ func runConformanceLoop() {
             UInt8((outLen >> 24) & 0xFF),
         ]
         if !writeExact(header, to: stdoutFD) || !writeExact(outBytes, to: stdoutFD) {
-            fputs("conformance-swift: failed to write frame\n", stderr)
+            writeStderr("conformance-swift: failed to write frame\n")
             exit(1)
         }
     }
