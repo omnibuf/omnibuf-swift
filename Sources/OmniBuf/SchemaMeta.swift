@@ -210,7 +210,8 @@ public struct SchemaMeta: Equatable, Sendable {
                 guard keyWT == WireType.wireUint && valWT == WireType.wireString else {
                     throw OmniBufError.parse("SchemaMeta fields map must have uint->string types")
                 }
-                try budget.addAlloc(count * fieldEntryOverhead)
+                try budget.addElements(count)
+                try budget.addAlloc(count: count, elementBytes: fieldEntryOverhead)
                 var mr = mapReader
                 for _ in 0..<count {
                     let k64 = try mr.readVarint()
@@ -236,7 +237,8 @@ public struct SchemaMeta: Equatable, Sendable {
                 guard keyWT == WireType.wireUint && valWT == WireType.wireSubMsg else {
                     throw OmniBufError.parse("SchemaMeta children map must have uint->submsg types")
                 }
-                try budget.addAlloc(count * childEntryOverhead)
+                try budget.addElements(count)
+                try budget.addAlloc(count: count, elementBytes: childEntryOverhead)
                 var mr = mapReader
                 for _ in 0..<count {
                     let k64 = try mr.readVarint()

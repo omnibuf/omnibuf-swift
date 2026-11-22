@@ -80,6 +80,7 @@ public struct OmniBufReader {
 
     @inlinable
     public init(base: UnsafePointer<UInt8>?, count: Int) {
+        precondition(count >= 0, "OmniBufReader count must be non-negative")
         self.base = base
         self.count = count
         self.pos = 0
@@ -88,7 +89,10 @@ public struct OmniBufReader {
     @inlinable
     public var position: Int {
         get { pos }
-        set { pos = newValue }
+        set {
+            precondition(newValue >= 0 && newValue <= count, "OmniBufReader position out of bounds")
+            pos = newValue
+        }
     }
 
     @inlinable

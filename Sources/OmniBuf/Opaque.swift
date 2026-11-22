@@ -268,8 +268,9 @@ public enum OpaqueWire {
 
     // MARK: - In-Place Wire Splicing
 
-    /// Splices unmodified contiguous byte ranges from `raw` into `dst` (preserving any existing
-    /// prefix bytes in `dst`) and invokes `appendDirty` only for fields marked in `dirtyMask`.
+    /// Splices unmodified contiguous byte ranges from `raw` (or its `[offset..<(offset + length)]` slice)
+    /// into `dst` (preserving any existing prefix bytes in `dst`) and invokes `appendDirty` only for
+    /// fields marked in `dirtyMask` (fields 1..63) or `dirtyHigh` (fields >= 64).
     ///
     /// Untouched fields are hopped in O(1) time without decoding their bodies.
     /// `dst` is a value-typed `[UInt8]`, so `raw` is never mutated even if they originally shared storage.
@@ -277,22 +278,32 @@ public enum OpaqueWire {
     public static func spliceFields(
         into dst: inout [UInt8],
         raw: [UInt8],
+        offset: Int = 0,
+        length: Int? = nil,
         dirtyMask: UInt64,
-        maxField: UInt16,
-        appendDirty: (inout OmniBufWriter, UInt16) -> Void
+        dirtyHigh: Set<UInt32> = [],
+        maxField: UInt32,
+        appendDirty: (inout OmniBufWriter, UInt32) -> Void
     ) {
+        let sliceLen = length ?? (raw.count - offset)
+        precondition(
+            offset >= 0 && sliceLen >= 0 && offset <= raw.count && sliceLen <= raw.count - offset,
+            "OpaqueWire.spliceFields slice out of bounds"
+        )
         let userMask = dirtyMask & ~1
         let prefixLen = dst.count
-        var writer = OmniBufWriter(initialCapacity: prefixLen &+ raw.count &+ 64)
+        var writer = OmniBufWriter(initialCapacity: prefixLen &+ sliceLen &+ 64)
         if prefixLen > 0 {
             writer.appendRaw(dst)
         }
-        raw.withUnsafeBufferPointer { buf in
+        raw.withUnsafeBufferPointer { fullBuf in
+            let buf = UnsafeBufferPointer(start: fullBuf.baseAddress?.advanced(by: offset), count: sliceLen)
             let base = buf.baseAddress
             var r = OmniBufReader(buf)
             var cleanStart = 0
             var validEnd = 0
             var emitted: UInt64 = 0
+            var emittedHigh: Set<UInt32> = []
 
             while !r.isAtEnd {
                 let fieldStart = r.position
@@ -309,18 +320,28 @@ public enum OpaqueWire {
                 let fieldEnd = r.position
                 validEnd = fieldEnd
 
-                let bit: UInt64 = (fnum > 0 && fnum < 64) ? (1 &<< UInt64(fnum)) : 0
-                if (userMask & bit) != 0 {
+                if fnum > 0 && fnum < 64 {
+                    let bit: UInt64 = 1 &<< UInt64(fnum)
+                    if (userMask & bit) != 0 {
+                        if cleanStart < fieldStart, let b = base {
+                            writer.appendRaw(b.advanced(by: cleanStart), count: fieldStart &- cleanStart)
+                        }
+                        if (emitted & bit) == 0 {
+                            appendDirty(&writer, fnum)
+                            emitted |= bit
+                        }
+                        cleanStart = fieldEnd
+                    } else {
+                        emitted |= bit
+                    }
+                } else if fnum >= 64 && dirtyHigh.contains(fnum) {
                     if cleanStart < fieldStart, let b = base {
                         writer.appendRaw(b.advanced(by: cleanStart), count: fieldStart &- cleanStart)
                     }
-                    if (emitted & bit) == 0 {
-                        appendDirty(&writer, UInt16(fnum))
-                        emitted |= bit
+                    if emittedHigh.insert(fnum).inserted {
+                        appendDirty(&writer, fnum)
                     }
                     cleanStart = fieldEnd
-                } else {
-                    emitted |= bit
                 }
             }
 
@@ -332,11 +353,17 @@ public enum OpaqueWire {
             if rem != 0 {
                 let limit = min(maxField, 63)
                 if limit >= 1 {
-                    for fnum in UInt16(1)...limit {
+                    for fnum in UInt32(1)...limit {
                         if (rem & (1 &<< UInt64(fnum))) != 0 {
                             appendDirty(&writer, fnum)
                         }
                     }
+                }
+            }
+
+            if !dirtyHigh.isEmpty {
+                for fnum in dirtyHigh.sorted() where fnum >= 64 && !emittedHigh.contains(fnum) {
+                    appendDirty(&writer, fnum)
                 }
             }
         }
@@ -349,21 +376,31 @@ public enum OpaqueWire {
     public static func trySpliceFields(
         into dst: inout [UInt8],
         raw: [UInt8],
+        offset: Int = 0,
+        length: Int? = nil,
         dirtyMask: UInt64,
-        maxField: UInt16,
-        appendDirty: (inout OmniBufWriter, UInt16) -> Void
+        dirtyHigh: Set<UInt32> = [],
+        maxField: UInt32,
+        appendDirty: (inout OmniBufWriter, UInt32) -> Void
     ) throws {
+        let sliceLen = length ?? (raw.count - offset)
+        precondition(
+            offset >= 0 && sliceLen >= 0 && offset <= raw.count && sliceLen <= raw.count - offset,
+            "OpaqueWire.trySpliceFields slice out of bounds"
+        )
         let userMask = dirtyMask & ~1
         let prefixLen = dst.count
-        var writer = OmniBufWriter(initialCapacity: prefixLen &+ raw.count &+ 64)
+        var writer = OmniBufWriter(initialCapacity: prefixLen &+ sliceLen &+ 64)
         if prefixLen > 0 {
             writer.appendRaw(dst)
         }
-        try raw.withUnsafeBufferPointer { buf in
+        try raw.withUnsafeBufferPointer { fullBuf in
+            let buf = UnsafeBufferPointer(start: fullBuf.baseAddress?.advanced(by: offset), count: sliceLen)
             let base = buf.baseAddress
             var r = OmniBufReader(buf)
             var cleanStart = 0
             var emitted: UInt64 = 0
+            var emittedHigh: Set<UInt32> = []
 
             while !r.isAtEnd {
                 let fieldStart = r.position
@@ -379,18 +416,28 @@ public enum OpaqueWire {
                 }
                 let fieldEnd = r.position
 
-                let bit: UInt64 = (fnum > 0 && fnum < 64) ? (1 &<< UInt64(fnum)) : 0
-                if (userMask & bit) != 0 {
+                if fnum > 0 && fnum < 64 {
+                    let bit: UInt64 = 1 &<< UInt64(fnum)
+                    if (userMask & bit) != 0 {
+                        if cleanStart < fieldStart, let b = base {
+                            writer.appendRaw(b.advanced(by: cleanStart), count: fieldStart &- cleanStart)
+                        }
+                        if (emitted & bit) == 0 {
+                            appendDirty(&writer, fnum)
+                            emitted |= bit
+                        }
+                        cleanStart = fieldEnd
+                    } else {
+                        emitted |= bit
+                    }
+                } else if fnum >= 64 && dirtyHigh.contains(fnum) {
                     if cleanStart < fieldStart, let b = base {
                         writer.appendRaw(b.advanced(by: cleanStart), count: fieldStart &- cleanStart)
                     }
-                    if (emitted & bit) == 0 {
-                        appendDirty(&writer, UInt16(fnum))
-                        emitted |= bit
+                    if emittedHigh.insert(fnum).inserted {
+                        appendDirty(&writer, fnum)
                     }
                     cleanStart = fieldEnd
-                } else {
-                    emitted |= bit
                 }
             }
 
@@ -402,11 +449,17 @@ public enum OpaqueWire {
             if rem != 0 {
                 let limit = min(maxField, 63)
                 if limit >= 1 {
-                    for fnum in UInt16(1)...limit {
+                    for fnum in UInt32(1)...limit {
                         if (rem & (1 &<< UInt64(fnum))) != 0 {
                             appendDirty(&writer, fnum)
                         }
                     }
+                }
+            }
+
+            if !dirtyHigh.isEmpty {
+                for fnum in dirtyHigh.sorted() where fnum >= 64 && !emittedHigh.contains(fnum) {
+                    appendDirty(&writer, fnum)
                 }
             }
         }

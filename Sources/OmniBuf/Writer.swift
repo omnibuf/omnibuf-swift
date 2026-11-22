@@ -46,7 +46,9 @@ public struct OmniBufWriter: ~Copyable {
     @inlinable
     @inline(__always)
     public mutating func ensureCapacity(_ extra: Int) {
-        let needed = count &+ extra
+        precondition(extra >= 0, "OmniBufWriter.ensureCapacity extra must be non-negative")
+        let (needed, overflow) = count.addingReportingOverflow(extra)
+        precondition(!overflow, "OmniBufWriter capacity overflow")
         if needed <= capacity { return }
         grow(needed: needed)
     }
@@ -54,8 +56,12 @@ public struct OmniBufWriter: ~Copyable {
     @usableFromInline
     @inline(never)
     internal mutating func grow(needed: Int) {
-        var newCap = capacity &* 2
+        var newCap = capacity
         while newCap < needed {
+            if newCap > Int.max / 2 {
+                newCap = needed
+                break
+            }
             newCap &*= 2
         }
         let newPtr = UnsafeMutablePointer<UInt8>.allocate(capacity: newCap)
@@ -344,6 +350,7 @@ public struct OmniBufWriter: ~Copyable {
     @inlinable
     @inline(__always)
     public mutating func truncate(to newCount: Int) {
+        precondition(newCount >= 0, "OmniBufWriter.truncate newCount must be non-negative")
         if newCount < count {
             count = newCount
         }

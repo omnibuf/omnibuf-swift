@@ -148,6 +148,11 @@ public struct Location: OmniBufMessage, Equatable, Sendable {
     }
 
     public static var omniBufSchemaMeta: SchemaMeta {
+        var visited: Set<String> = []
+        return buildOmniBufSchemaMeta(visited: &visited)
+    }
+
+    public static func buildOmniBufSchemaMeta(visited: inout Set<String>) -> SchemaMeta {
         var fields: [UInt32: String] = [:]
         let children: [UInt32: SchemaMeta] = [:]
         fields[1] = "region"
@@ -181,6 +186,7 @@ public struct OpaqueLocation: Sendable {
 
     @inlinable
     public init(raw: [UInt8], offset: Int, length: Int) {
+        precondition(offset >= 0 && length >= 0 && offset <= raw.count && length <= raw.count - offset, "OpaqueLocation slice out of bounds")
         self.raw = raw
         self.offset = offset
         self.length = length
@@ -256,7 +262,7 @@ public struct OpaqueLocation: Sendable {
     }
 
     @inlinable
-    internal func appendDirtyField(_ fnum: UInt16, into w: inout OmniBufWriter) {
+    internal func appendDirtyField(_ fnum: UInt32, into w: inout OmniBufWriter) {
         let deterministic = true
         _ = deterministic
         switch fnum {
@@ -297,9 +303,12 @@ public struct OpaqueLocation: Sendable {
 
     @inlinable
     public func marshal() -> [UInt8] {
-        if dirtyMask == 0 { return raw }
+        if dirtyMask == 0 {
+            if offset == 0 && length == raw.count { return raw }
+            return Array(raw[offset..<(offset + length)])
+        }
         var dst: [UInt8] = []
-        OpaqueWire.spliceFields(into: &dst, raw: raw, dirtyMask: dirtyMask, maxField: 6) { w, fnum in
+        OpaqueWire.spliceFields(into: &dst, raw: raw, offset: offset, length: length, dirtyMask: dirtyMask, maxField: 6) { w, fnum in
             self.appendDirtyField(fnum, into: &w)
         }
         return dst
@@ -308,7 +317,7 @@ public struct OpaqueLocation: Sendable {
     @inlinable
     public func tryMarshal() throws -> [UInt8] {
         var dst: [UInt8] = []
-        try OpaqueWire.trySpliceFields(into: &dst, raw: raw, dirtyMask: dirtyMask, maxField: 6) { w, fnum in
+        try OpaqueWire.trySpliceFields(into: &dst, raw: raw, offset: offset, length: length, dirtyMask: dirtyMask, maxField: 6) { w, fnum in
             self.appendDirtyField(fnum, into: &w)
         }
         return dst
@@ -427,6 +436,11 @@ public struct Neighbor: OmniBufMessage, Equatable, Sendable {
     }
 
     public static var omniBufSchemaMeta: SchemaMeta {
+        var visited: Set<String> = []
+        return buildOmniBufSchemaMeta(visited: &visited)
+    }
+
+    public static func buildOmniBufSchemaMeta(visited: inout Set<String>) -> SchemaMeta {
         var fields: [UInt32: String] = [:]
         let children: [UInt32: SchemaMeta] = [:]
         fields[1] = "peer_asn"
@@ -456,6 +470,7 @@ public struct OpaqueNeighbor: Sendable {
 
     @inlinable
     public init(raw: [UInt8], offset: Int, length: Int) {
+        precondition(offset >= 0 && length >= 0 && offset <= raw.count && length <= raw.count - offset, "OpaqueNeighbor slice out of bounds")
         self.raw = raw
         self.offset = offset
         self.length = length
@@ -511,7 +526,7 @@ public struct OpaqueNeighbor: Sendable {
     }
 
     @inlinable
-    internal func appendDirtyField(_ fnum: UInt16, into w: inout OmniBufWriter) {
+    internal func appendDirtyField(_ fnum: UInt32, into w: inout OmniBufWriter) {
         let deterministic = true
         _ = deterministic
         switch fnum {
@@ -541,9 +556,12 @@ public struct OpaqueNeighbor: Sendable {
 
     @inlinable
     public func marshal() -> [UInt8] {
-        if dirtyMask == 0 { return raw }
+        if dirtyMask == 0 {
+            if offset == 0 && length == raw.count { return raw }
+            return Array(raw[offset..<(offset + length)])
+        }
         var dst: [UInt8] = []
-        OpaqueWire.spliceFields(into: &dst, raw: raw, dirtyMask: dirtyMask, maxField: 4) { w, fnum in
+        OpaqueWire.spliceFields(into: &dst, raw: raw, offset: offset, length: length, dirtyMask: dirtyMask, maxField: 4) { w, fnum in
             self.appendDirtyField(fnum, into: &w)
         }
         return dst
@@ -552,7 +570,7 @@ public struct OpaqueNeighbor: Sendable {
     @inlinable
     public func tryMarshal() throws -> [UInt8] {
         var dst: [UInt8] = []
-        try OpaqueWire.trySpliceFields(into: &dst, raw: raw, dirtyMask: dirtyMask, maxField: 4) { w, fnum in
+        try OpaqueWire.trySpliceFields(into: &dst, raw: raw, offset: offset, length: length, dirtyMask: dirtyMask, maxField: 4) { w, fnum in
             self.appendDirtyField(fnum, into: &w)
         }
         return dst
@@ -792,8 +810,11 @@ public struct PeerUpdate: OmniBufMessage, Equatable, Sendable {
                     throw OmniBufError.parse("field 7 array element type mismatch")
                 }
                 try budget.addElements(count)
+                try budget.addAlloc(count: count, elementBytes: max(MemoryLayout<String>.stride, 1))
+                let (newCap, capOverflow) = self.tags.count.addingReportingOverflow(count)
+                if capOverflow { throw OmniBufError.allocationLimitExceeded("array capacity overflow") }
                 var er = er0
-                self.tags.reserveCapacity(self.tags.count &+ count)
+                self.tags.reserveCapacity(newCap)
                 for _ in 0..<count {
                     let elem = try er.readString()
                     try budget.addAlloc(elem.utf8.count)
@@ -813,8 +834,11 @@ public struct PeerUpdate: OmniBufMessage, Equatable, Sendable {
                     throw OmniBufError.parse("field 8 array element type mismatch")
                 }
                 try budget.addElements(count)
+                try budget.addAlloc(count: count, elementBytes: max(MemoryLayout<UInt32>.stride, 1))
+                let (newCap, capOverflow) = self.prefixes.count.addingReportingOverflow(count)
+                if capOverflow { throw OmniBufError.allocationLimitExceeded("array capacity overflow") }
                 var er = er0
-                self.prefixes.reserveCapacity(self.prefixes.count &+ count)
+                self.prefixes.reserveCapacity(newCap)
                 for _ in 0..<count {
                     let elem = UInt32(truncatingIfNeeded: try er.readVarint())
                     self.prefixes.append(elem)
@@ -844,8 +868,11 @@ public struct PeerUpdate: OmniBufMessage, Equatable, Sendable {
                     throw OmniBufError.parse("field 10 array element type mismatch")
                 }
                 try budget.addElements(count)
+                try budget.addAlloc(count: count, elementBytes: max(MemoryLayout<Neighbor>.stride, 16))
+                let (newCap, capOverflow) = self.neighbors.count.addingReportingOverflow(count)
+                if capOverflow { throw OmniBufError.allocationLimitExceeded("array capacity overflow") }
                 var er = er0
-                self.neighbors.reserveCapacity(self.neighbors.count &+ count)
+                self.neighbors.reserveCapacity(newCap)
                 for _ in 0..<count {
                     let elemDepth = arrDepth &+ 1
                     guard elemDepth <= budget.maxDepth else { throw OmniBufError.depthLimitExceeded(elemDepth) }
@@ -869,8 +896,16 @@ public struct PeerUpdate: OmniBufMessage, Equatable, Sendable {
     }
 
     public static var omniBufSchemaMeta: SchemaMeta {
+        var visited: Set<String> = []
+        return buildOmniBufSchemaMeta(visited: &visited)
+    }
+
+    public static func buildOmniBufSchemaMeta(visited: inout Set<String>) -> SchemaMeta {
         var fields: [UInt32: String] = [:]
         var children: [UInt32: SchemaMeta] = [:]
+        let typeKey = "omnibuf.bench.PeerUpdate"
+        let inserted = visited.insert(typeKey).inserted
+        defer { if inserted { visited.remove(typeKey) } }
         fields[1] = "asn"
         fields[2] = "router_id"
         fields[3] = "active"
@@ -880,9 +915,9 @@ public struct PeerUpdate: OmniBufMessage, Equatable, Sendable {
         fields[7] = "tags"
         fields[8] = "prefixes"
         fields[9] = "location"
-        children[9] = Location.omniBufSchemaMeta
+        if inserted { children[9] = Location.buildOmniBufSchemaMeta(visited: &visited) }
         fields[10] = "neighbors"
-        children[10] = Neighbor.omniBufSchemaMeta
+        if inserted { children[10] = Neighbor.buildOmniBufSchemaMeta(visited: &visited) }
         fields[11] = "sequence"
         return SchemaMeta(typeName: "PeerUpdate", fields: fields, children: children)
     }
@@ -914,6 +949,7 @@ public struct OpaquePeerUpdate: Sendable {
 
     @inlinable
     public init(raw: [UInt8], offset: Int, length: Int) {
+        precondition(offset >= 0 && length >= 0 && offset <= raw.count && length <= raw.count - offset, "OpaquePeerUpdate slice out of bounds")
         self.raw = raw
         self.offset = offset
         self.length = length
@@ -1049,7 +1085,7 @@ public struct OpaquePeerUpdate: Sendable {
     }
 
     @inlinable
-    internal func appendDirtyField(_ fnum: UInt16, into w: inout OmniBufWriter) {
+    internal func appendDirtyField(_ fnum: UInt32, into w: inout OmniBufWriter) {
         let deterministic = true
         _ = deterministic
         switch fnum {
@@ -1162,9 +1198,12 @@ public struct OpaquePeerUpdate: Sendable {
 
     @inlinable
     public func marshal() -> [UInt8] {
-        if dirtyMask == 0 { return raw }
+        if dirtyMask == 0 {
+            if offset == 0 && length == raw.count { return raw }
+            return Array(raw[offset..<(offset + length)])
+        }
         var dst: [UInt8] = []
-        OpaqueWire.spliceFields(into: &dst, raw: raw, dirtyMask: dirtyMask, maxField: 11) { w, fnum in
+        OpaqueWire.spliceFields(into: &dst, raw: raw, offset: offset, length: length, dirtyMask: dirtyMask, maxField: 11) { w, fnum in
             self.appendDirtyField(fnum, into: &w)
         }
         return dst
@@ -1173,7 +1212,7 @@ public struct OpaquePeerUpdate: Sendable {
     @inlinable
     public func tryMarshal() throws -> [UInt8] {
         var dst: [UInt8] = []
-        try OpaqueWire.trySpliceFields(into: &dst, raw: raw, dirtyMask: dirtyMask, maxField: 11) { w, fnum in
+        try OpaqueWire.trySpliceFields(into: &dst, raw: raw, offset: offset, length: length, dirtyMask: dirtyMask, maxField: 11) { w, fnum in
             self.appendDirtyField(fnum, into: &w)
         }
         return dst

@@ -35,10 +35,10 @@ public struct DecodeOptions: Sendable, Equatable {
         maxAllocBytes: Int = 64 * 1024 * 1024,
         maxDepth: Int = WireType.maxNestingDepth
     ) {
-        self.maxMessageBytes = maxMessageBytes
-        self.maxElements = maxElements
-        self.maxAllocBytes = maxAllocBytes
-        self.maxDepth = min(maxDepth, WireType.maxNestingDepth)
+        self.maxMessageBytes = max(0, maxMessageBytes)
+        self.maxElements = max(0, maxElements)
+        self.maxAllocBytes = max(0, maxAllocBytes)
+        self.maxDepth = max(0, min(maxDepth, WireType.maxNestingDepth))
     }
 
     public static let `default` = DecodeOptions()
@@ -54,14 +54,17 @@ public struct DecodeBudget: Sendable {
 
     @inlinable
     public init(options: DecodeOptions = .default) {
-        self.maxElements = options.maxElements
-        self.maxAllocBytes = options.maxAllocBytes
-        self.maxDepth = min(options.maxDepth, WireType.maxNestingDepth)
+        self.maxElements = max(0, options.maxElements)
+        self.maxAllocBytes = max(0, options.maxAllocBytes)
+        self.maxDepth = max(0, min(options.maxDepth, WireType.maxNestingDepth))
     }
 
     @inlinable
     @inline(__always)
     public mutating func addElements(_ count: Int) throws {
+        guard count >= 0 else {
+            throw OmniBufError.allocationLimitExceeded("negative element count \(count)")
+        }
         let (next, overflow) = elements.addingReportingOverflow(count)
         if overflow || next > maxElements {
             throw OmniBufError.allocationLimitExceeded(
@@ -74,6 +77,9 @@ public struct DecodeBudget: Sendable {
     @inlinable
     @inline(__always)
     public mutating func addAlloc(_ bytes: Int) throws {
+        guard bytes >= 0 else {
+            throw OmniBufError.allocationLimitExceeded("negative allocation \(bytes)")
+        }
         let (next, overflow) = allocBytes.addingReportingOverflow(bytes)
         if overflow || next > maxAllocBytes {
             throw OmniBufError.allocationLimitExceeded(
@@ -81,5 +87,22 @@ public struct DecodeBudget: Sendable {
             )
         }
         allocBytes = next
+    }
+
+    @inlinable
+    @inline(__always)
+    public mutating func addAlloc(count: Int, elementBytes: Int) throws {
+        guard count >= 0 && elementBytes >= 0 else {
+            throw OmniBufError.allocationLimitExceeded(
+                "negative allocation count \(count) or elementBytes \(elementBytes)"
+            )
+        }
+        let (total, overflow) = count.multipliedReportingOverflow(by: elementBytes)
+        if overflow {
+            throw OmniBufError.allocationLimitExceeded(
+                "allocation overflow for \(count) elements of \(elementBytes) bytes"
+            )
+        }
+        try addAlloc(total)
     }
 }

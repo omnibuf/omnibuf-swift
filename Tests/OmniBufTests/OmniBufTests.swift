@@ -163,4 +163,168 @@ struct OmniBufCoreTests {
         #expect(replaced.id == 0)
         #expect(replaced.tags == ["b"])
     }
+
+    @Test("Blind decoder handles thousands of repeated sub-message segments without stack overflow")
+    func testBlindRepeatedSubMsgNoStackOverflow() throws {
+        var w = OmniBufWriter(initialCapacity: 65_536)
+        // 20,000 empty sub-message occurrences on field #1 plus a final occurrence with field #1 = 42
+        for _ in 0..<20_000 {
+            w.appendTag(fieldNumber: 1, wireType: WireType.wireSubMsg)
+            w.appendVarint(0)
+        }
+        w.appendTag(fieldNumber: 1, wireType: WireType.wireSubMsg)
+        let lenPos = w.reserveLength2()
+        w.appendTag(fieldNumber: 1, wireType: WireType.wireUint)
+        w.appendVarint(42)
+        w.backpatchLength2(at: lenPos)
+
+        let bytes = w.toBytes()
+        let decoded = try decodeBlind(bytes)
+        if case .object(let sub) = decoded["field_1"] {
+            #expect(sub["field_1"] == .uint(42))
+        } else {
+            Issue.record("expected merged sub-message object")
+        }
+
+        // Verify element budget is charged for repeated sub-message occurrences
+        let tightOpts = DecodeBlindOptions(
+            decodeOptions: DecodeOptions(maxElements: 100)
+        )
+        #expect(throws: OmniBufError.self) {
+            _ = try decodeBlind(bytes, options: tightOpts)
+        }
+    }
+
+    @Test("Blind decoder charges budget for distinct scalar fields")
+    func testBlindDistinctScalarFieldsBudget() {
+        var w = OmniBufWriter()
+        for fnum in UInt32(1)...50 {
+            w.appendTag(fieldNumber: fnum, wireType: WireType.wireBoolTrue)
+        }
+        let tightOpts = DecodeBlindOptions(
+            decodeOptions: DecodeOptions(maxElements: 20)
+        )
+        #expect(throws: OmniBufError.self) {
+            _ = try decodeBlind(w.toBytes(), options: tightOpts)
+        }
+    }
+
+    @Test("DecodeOptions clamps negative limits and DecodeBudget rejects negative/overflowing values")
+    func testDecodeBudgetSafety() throws {
+        let opts = DecodeOptions(
+            maxMessageBytes: -10,
+            maxElements: -5,
+            maxAllocBytes: -100,
+            maxDepth: -3
+        )
+        #expect(opts.maxMessageBytes == 0)
+        #expect(opts.maxElements == 0)
+        #expect(opts.maxAllocBytes == 0)
+        #expect(opts.maxDepth == 0)
+
+        var budget = DecodeBudget(options: .default)
+        #expect(throws: OmniBufError.self) { try budget.addElements(-1) }
+        #expect(throws: OmniBufError.self) { try budget.addAlloc(-1) }
+        #expect(throws: OmniBufError.self) { try budget.addAlloc(count: -1, elementBytes: 8) }
+        #expect(throws: OmniBufError.self) { try budget.addAlloc(count: 8, elementBytes: -1) }
+        #expect(throws: OmniBufError.self) { try budget.addAlloc(count: Int.max, elementBytes: 32) }
+    }
+
+    @Test("SchemaMeta.decodeSlice enforces maxElements limit")
+    func testSchemaMetaElementBudget() {
+        var fields: [UInt32: String] = [:]
+        for i in UInt32(1)...20 {
+            fields[i] = "f\(i)"
+        }
+        var w = OmniBufWriter()
+        SchemaMeta(typeName: "Big", fields: fields).appendField0(to: &w)
+        let packet = w.toBytes()
+        let tightOpts = DecodeBlindOptions(
+            decodeOptions: DecodeOptions(maxElements: 5)
+        )
+        #expect(throws: OmniBufError.self) {
+            _ = try decodeBlind(packet, options: tightOpts)
+        }
+    }
+
+    @Test("OpaqueWire splices sub-ranges and supports field numbers >= 64 and > 65535")
+    func testOpaqueWireSubRangeAndHighFields() throws {
+        // Build a child payload with field #1 = 10, field #70 = 700, field #100_000 = 999
+        var childWriter = OmniBufWriter()
+        childWriter.appendTag(fieldNumber: 1, wireType: WireType.wireUint)
+        childWriter.appendVarint(10)
+        childWriter.appendTag(fieldNumber: 70, wireType: WireType.wireUint)
+        childWriter.appendVarint(700)
+        childWriter.appendTag(fieldNumber: 100_000, wireType: WireType.wireUint)
+        childWriter.appendVarint(999)
+        let childBytes = childWriter.toBytes()
+
+        // Embed childBytes inside a larger parent buffer with surrounding sentinel bytes
+        let parent: [UInt8] = [0xFF, 0xFE, 0xFD] + childBytes + [0xFC, 0xFB]
+        let offset = 3
+        let length = childBytes.count
+
+        // Splice dirty field #70 (replace), field #100_000 (replace), and field #200_000 (append new)
+        var dst: [UInt8] = []
+        try OpaqueWire.trySpliceFields(
+            into: &dst,
+            raw: parent,
+            offset: offset,
+            length: length,
+            dirtyMask: 0,
+            dirtyHigh: [70, 100_000, 200_000],
+            maxField: 200_000
+        ) { w, fnum in
+            w.appendTag(fieldNumber: fnum, wireType: WireType.wireUint)
+            switch fnum {
+            case 70: w.appendVarint(701)
+            case 100_000: w.appendVarint(1000)
+            case 200_000: w.appendVarint(2000)
+            default: break
+            }
+        }
+
+        let decoded = try decodeBlind(dst)
+        #expect(decoded["field_1"] == .uint(10))
+        #expect(decoded["field_70"] == .uint(701))
+        #expect(decoded["field_100000"] == .uint(1000))
+        #expect(decoded["field_200000"] == .uint(2000))
+        #expect(decoded.count == 4)
+    }
+
+    @Test("Indirect<T> provides copy-on-write value semantics, Equatable, and Hashable")
+    func testIndirectCopyOnWrite() {
+        let a = Indirect<Int>(10)
+        var b = a
+        #expect(a == b)
+        #expect(a.hashValue == b.hashValue)
+
+        b.value = 42
+        #expect(a.value == 10)
+        #expect(b.value == 42)
+        #expect(a != b)
+
+        // Mutating a uniquely referenced Indirect updates in place
+        var c = Indirect<String>("hello")
+        c.value = "world"
+        #expect(c.value == "world")
+    }
+
+    @Test("OmniBufWriter truncate and OmniBufReader position within valid bounds")
+    func testWriterAndReaderBounds() throws {
+        var w = OmniBufWriter(initialCapacity: 64)
+        w.appendRaw([1, 2, 3, 4, 5])
+        w.truncate(to: 3)
+        #expect(w.toBytes() == [1, 2, 3])
+        w.truncate(to: 0)
+        #expect(w.toBytes() == [])
+
+        let data: [UInt8] = [0x03, 0x05]
+        let v = try data.withUnsafeBufferPointer { buf -> UInt64 in
+            var r = OmniBufReader(base: buf.baseAddress, count: buf.count)
+            r.position = 1
+            return try r.readVarint()
+        }
+        #expect(v == 2)
+    }
 }

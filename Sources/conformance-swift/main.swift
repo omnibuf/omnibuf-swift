@@ -138,8 +138,8 @@ private func float64CanonicalBits(_ d: Double) -> UInt64 {
 }
 
 private func checkSpliceAliasedPrefix(_ packet: [UInt8]) -> String? {
-    let appendDirty: (inout OmniBufWriter, UInt16) -> Void = { w, fnum in
-        w.appendTag(fieldNumber: UInt32(fnum), wireType: WireType.wireUint)
+    let appendDirty: (inout OmniBufWriter, UInt32) -> Void = { w, fnum in
+        w.appendTag(fieldNumber: fnum, wireType: WireType.wireUint)
         w.appendVarint(1 << 40)
     }
     let original = packet

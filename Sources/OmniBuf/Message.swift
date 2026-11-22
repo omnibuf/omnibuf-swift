@@ -106,17 +106,42 @@ public enum OmniBuf {
 
 // MARK: - Indirect Box for Recursive Structs (e.g. TreeNode)
 
-/// Value-semantic heap box enabling recursive Swift structs (such as `TreeNode`).
-public final class Indirect<T: Sendable>: @unchecked Sendable {
-    public var value: T
+/// Value-semantic copy-on-write heap box enabling recursive Swift structs (such as `TreeNode`).
+public struct Indirect<T: Sendable>: Sendable {
+    private final class Storage: @unchecked Sendable {
+        var value: T
+        init(_ value: T) {
+            self.value = value
+        }
+    }
+
+    private var storage: Storage
+
     public init(_ value: T) {
-        self.value = value
+        self.storage = Storage(value)
+    }
+
+    public var value: T {
+        get { storage.value }
+        set {
+            if !isKnownUniquelyReferenced(&storage) {
+                storage = Storage(newValue)
+            } else {
+                storage.value = newValue
+            }
+        }
     }
 }
 
 extension Indirect: Equatable where T: Equatable {
     public static func == (lhs: Indirect<T>, rhs: Indirect<T>) -> Bool {
         lhs.value == rhs.value
+    }
+}
+
+extension Indirect: Hashable where T: Hashable {
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(value)
     }
 }
 
@@ -689,8 +714,13 @@ public enum Field {
                     throw OmniBufError.parse("field \(id) expected WireString array, got element type \(elemWT)")
                 }
                 try budget.addElements(count)
+                try budget.addAlloc(count: count, elementBytes: MemoryLayout<String>.stride)
+                let (newCap, capOverflow) = root[keyPath: kp].count.addingReportingOverflow(count)
+                if capOverflow {
+                    throw OmniBufError.allocationLimitExceeded("array capacity overflow")
+                }
                 var er = er0
-                root[keyPath: kp].reserveCapacity(root[keyPath: kp].count &+ count)
+                root[keyPath: kp].reserveCapacity(newCap)
                 for _ in 0..<count {
                     let s = try er.readString()
                     try budget.addAlloc(s.utf8.count)
@@ -736,9 +766,13 @@ public enum Field {
                     throw OmniBufError.parse("field \(id) expected WireUint array, got element type \(elemWT)")
                 }
                 try budget.addElements(count)
-                try budget.addAlloc(count * 4)
+                try budget.addAlloc(count: count, elementBytes: 4)
+                let (newCap, capOverflow) = root[keyPath: kp].count.addingReportingOverflow(count)
+                if capOverflow {
+                    throw OmniBufError.allocationLimitExceeded("array capacity overflow")
+                }
                 var er = er0
-                root[keyPath: kp].reserveCapacity(root[keyPath: kp].count &+ count)
+                root[keyPath: kp].reserveCapacity(newCap)
                 for _ in 0..<count {
                     root[keyPath: kp].append(UInt32(truncatingIfNeeded: try er.readVarint()))
                 }
@@ -799,8 +833,13 @@ public enum Field {
                     throw OmniBufError.parse("field \(id) expected WireSubMsg array, got element type \(elemWT)")
                 }
                 try budget.addElements(count)
+                try budget.addAlloc(count: count, elementBytes: max(MemoryLayout<Child>.stride, 16))
+                let (newCap, capOverflow) = root[keyPath: kp].count.addingReportingOverflow(count)
+                if capOverflow {
+                    throw OmniBufError.allocationLimitExceeded("array capacity overflow")
+                }
                 var er = er0
-                root[keyPath: kp].reserveCapacity(root[keyPath: kp].count &+ count)
+                root[keyPath: kp].reserveCapacity(newCap)
                 let elemDepth = arrDepth &+ 1
                 for _ in 0..<count {
                     guard elemDepth <= budget.maxDepth else {
@@ -859,10 +898,11 @@ public enum Field {
                     throw OmniBufError.parse("field \(id) expected map<string, uint64>, got (\(keyWT), \(valWT))")
                 }
                 try budget.addElements(count)
+                try budget.addAlloc(count: count, elementBytes: 32)
                 var mr = mr0
                 for _ in 0..<count {
                     let k = try mr.readString()
-                    try budget.addAlloc(k.utf8.count + 16)
+                    try budget.addAlloc(k.utf8.count)
                     let v = try mr.readVarint()
                     root[keyPath: kp][k] = v
                 }

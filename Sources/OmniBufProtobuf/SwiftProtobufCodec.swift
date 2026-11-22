@@ -818,7 +818,7 @@ private struct OmniBufSwiftDecoder: SwiftProtobuf.Decoder {
         }
         try budget.addElements(count)
         if elemAllocBytes > 0 {
-            try budget.addAlloc(count * elemAllocBytes)
+            try budget.addAlloc(count: count, elementBytes: elemAllocBytes)
         }
         var er = er0
         try body(&er, count, &budget)
@@ -827,44 +827,52 @@ private struct OmniBufSwiftDecoder: SwiftProtobuf.Decoder {
         }
     }
 
+    private static func safeReserve<T>(_ array: inout [T], additional count: Int) throws {
+        let (newCap, overflow) = array.count.addingReportingOverflow(count)
+        if overflow {
+            throw OmniBufError.allocationLimitExceeded("array capacity overflow")
+        }
+        array.reserveCapacity(newCap)
+    }
+
     mutating func decodeRepeatedFloatField(value: inout [Float]) throws {
         try decodeArray(expectedElemWT: WireType.wireFloat32, elemAllocBytes: 4) { er, cnt, _ in
-            value.reserveCapacity(value.count &+ cnt)
+            try Self.safeReserve(&value, additional: cnt)
             for _ in 0..<cnt { value.append(try er.readFloat32()) }
         }
     }
 
     mutating func decodeRepeatedDoubleField(value: inout [Double]) throws {
         try decodeArray(expectedElemWT: WireType.wireFloat64, elemAllocBytes: 8) { er, cnt, _ in
-            value.reserveCapacity(value.count &+ cnt)
+            try Self.safeReserve(&value, additional: cnt)
             for _ in 0..<cnt { value.append(try er.readFloat64()) }
         }
     }
 
     mutating func decodeRepeatedInt32Field(value: inout [Int32]) throws {
         try decodeArray(expectedElemWT: WireType.wireSint, elemAllocBytes: 4) { er, cnt, _ in
-            value.reserveCapacity(value.count &+ cnt)
+            try Self.safeReserve(&value, additional: cnt)
             for _ in 0..<cnt { value.append(try er.readSint32()) }
         }
     }
 
     mutating func decodeRepeatedInt64Field(value: inout [Int64]) throws {
         try decodeArray(expectedElemWT: WireType.wireSint, elemAllocBytes: 8) { er, cnt, _ in
-            value.reserveCapacity(value.count &+ cnt)
+            try Self.safeReserve(&value, additional: cnt)
             for _ in 0..<cnt { value.append(try er.readSint64()) }
         }
     }
 
     mutating func decodeRepeatedUInt32Field(value: inout [UInt32]) throws {
         try decodeArray(expectedElemWT: WireType.wireUint, elemAllocBytes: 4) { er, cnt, _ in
-            value.reserveCapacity(value.count &+ cnt)
+            try Self.safeReserve(&value, additional: cnt)
             for _ in 0..<cnt { value.append(UInt32(truncatingIfNeeded: try er.readVarint())) }
         }
     }
 
     mutating func decodeRepeatedUInt64Field(value: inout [UInt64]) throws {
         try decodeArray(expectedElemWT: WireType.wireUint, elemAllocBytes: 8) { er, cnt, _ in
-            value.reserveCapacity(value.count &+ cnt)
+            try Self.safeReserve(&value, additional: cnt)
             for _ in 0..<cnt { value.append(try er.readVarint()) }
         }
     }
@@ -879,42 +887,42 @@ private struct OmniBufSwiftDecoder: SwiftProtobuf.Decoder {
 
     mutating func decodeRepeatedFixed32Field(value: inout [UInt32]) throws {
         try decodeArray(expectedElemWT: WireType.wireFixed32, elemAllocBytes: 4) { er, cnt, _ in
-            value.reserveCapacity(value.count &+ cnt)
+            try Self.safeReserve(&value, additional: cnt)
             for _ in 0..<cnt { value.append(try er.readFixed32()) }
         }
     }
 
     mutating func decodeRepeatedFixed64Field(value: inout [UInt64]) throws {
         try decodeArray(expectedElemWT: WireType.wireFixed64, elemAllocBytes: 8) { er, cnt, _ in
-            value.reserveCapacity(value.count &+ cnt)
+            try Self.safeReserve(&value, additional: cnt)
             for _ in 0..<cnt { value.append(try er.readFixed64()) }
         }
     }
 
     mutating func decodeRepeatedSFixed32Field(value: inout [Int32]) throws {
         try decodeArray(expectedElemWT: WireType.wireSfixed32, elemAllocBytes: 4) { er, cnt, _ in
-            value.reserveCapacity(value.count &+ cnt)
+            try Self.safeReserve(&value, additional: cnt)
             for _ in 0..<cnt { value.append(try er.readSfixed32()) }
         }
     }
 
     mutating func decodeRepeatedSFixed64Field(value: inout [Int64]) throws {
         try decodeArray(expectedElemWT: WireType.wireSfixed64, elemAllocBytes: 8) { er, cnt, _ in
-            value.reserveCapacity(value.count &+ cnt)
+            try Self.safeReserve(&value, additional: cnt)
             for _ in 0..<cnt { value.append(try er.readSfixed64()) }
         }
     }
 
     mutating func decodeRepeatedBoolField(value: inout [Bool]) throws {
         try decodeArray(expectedElemWT: WireType.wireBoolFalse, elemAllocBytes: 1) { er, cnt, _ in
-            value.reserveCapacity(value.count &+ cnt)
+            try Self.safeReserve(&value, additional: cnt)
             for _ in 0..<cnt { value.append(try er.readBoolByte()) }
         }
     }
 
     mutating func decodeRepeatedStringField(value: inout [String]) throws {
-        try decodeArray(expectedElemWT: WireType.wireString, elemAllocBytes: 0) { er, cnt, b in
-            value.reserveCapacity(value.count &+ cnt)
+        try decodeArray(expectedElemWT: WireType.wireString, elemAllocBytes: MemoryLayout<String>.stride) { er, cnt, b in
+            try Self.safeReserve(&value, additional: cnt)
             for _ in 0..<cnt {
                 let s = try er.readString()
                 try b.addAlloc(s.utf8.count)
@@ -924,8 +932,8 @@ private struct OmniBufSwiftDecoder: SwiftProtobuf.Decoder {
     }
 
     mutating func decodeRepeatedBytesField(value: inout [Data]) throws {
-        try decodeArray(expectedElemWT: WireType.wireBytes, elemAllocBytes: 0) { er, cnt, b in
-            value.reserveCapacity(value.count &+ cnt)
+        try decodeArray(expectedElemWT: WireType.wireBytes, elemAllocBytes: MemoryLayout<Data>.stride) { er, cnt, b in
+            try Self.safeReserve(&value, additional: cnt)
             for _ in 0..<cnt {
                 let slice = try er.readLenSlice()
                 try b.addAlloc(slice.count)
@@ -935,8 +943,8 @@ private struct OmniBufSwiftDecoder: SwiftProtobuf.Decoder {
     }
 
     mutating func decodeRepeatedEnumField<E: SwiftProtobuf.Enum>(value: inout [E]) throws where E.RawValue == Int {
-        try decodeArray(expectedElemWT: WireType.wireSint, elemAllocBytes: 4) { er, cnt, _ in
-            value.reserveCapacity(value.count &+ cnt)
+        try decodeArray(expectedElemWT: WireType.wireSint, elemAllocBytes: max(MemoryLayout<E>.stride, 4)) { er, cnt, _ in
+            try Self.safeReserve(&value, additional: cnt)
             for _ in 0..<cnt {
                 let raw = Int(try er.readSint32())
                 value.append(E(rawValue: raw) ?? E())
@@ -946,8 +954,8 @@ private struct OmniBufSwiftDecoder: SwiftProtobuf.Decoder {
 
     mutating func decodeRepeatedMessageField<M: SwiftProtobuf.Message>(value: inout [M]) throws {
         let elemDepth = depth &+ 2
-        try decodeArray(expectedElemWT: WireType.wireSubMsg, elemAllocBytes: 0) { er, cnt, b in
-            value.reserveCapacity(value.count &+ cnt)
+        try decodeArray(expectedElemWT: WireType.wireSubMsg, elemAllocBytes: max(MemoryLayout<M>.stride, 16)) { er, cnt, b in
+            try Self.safeReserve(&value, additional: cnt)
             for _ in 0..<cnt {
                 guard elemDepth <= b.maxDepth else {
                     throw OmniBufError.depthLimitExceeded(elemDepth)
@@ -986,6 +994,7 @@ private struct OmniBufSwiftDecoder: SwiftProtobuf.Decoder {
             throw OmniBufError.parse("WireMap type mismatch: expected (\(expectedKeyWT),\(expectedValWT)), got (\(keyWT),\(valWT))")
         }
         try budget.addElements(count)
+        try budget.addAlloc(count: count, elementBytes: 32)
         var mr = mr0
         for _ in 0..<count {
             let k = try readMapScalar(KeyType.self, from: &mr, budget: &budget)
@@ -1013,6 +1022,7 @@ private struct OmniBufSwiftDecoder: SwiftProtobuf.Decoder {
             throw OmniBufError.parse("WireMap enum type mismatch")
         }
         try budget.addElements(count)
+        try budget.addAlloc(count: count, elementBytes: 32)
         var mr = mr0
         for _ in 0..<count {
             let k = try readMapScalar(KeyType.self, from: &mr, budget: &budget)
@@ -1040,6 +1050,7 @@ private struct OmniBufSwiftDecoder: SwiftProtobuf.Decoder {
             throw OmniBufError.parse("WireMap message type mismatch")
         }
         try budget.addElements(count)
+        try budget.addAlloc(count: count, elementBytes: max(MemoryLayout<ValueType>.stride, 32))
         var mr = mr0
         let valDepth = mapDepth &+ 1
         for _ in 0..<count {

@@ -60,18 +60,30 @@ struct OmniBufSwiftPlugin: CodeGenerator {
         descriptor.name
     }
 
-    private func camelCase(_ snake: String) -> String {
+    private func camelCaseRaw(_ snake: String) -> String {
+        let leadingUnderscores = snake.prefix(while: { $0 == "_" })
         let parts = snake.split(separator: "_")
-        guard let first = parts.first else { return snake }
-        var res = first.lowercased()
+        guard let first = parts.first else {
+            return snake.isEmpty ? "_" : snake
+        }
+        var res = String(leadingUnderscores) + first.lowercased()
         for p in parts.dropFirst() {
             res += p.prefix(1).uppercased() + p.dropFirst().lowercased()
         }
-        return escapeKeyword(res)
+        if let firstChar = res.first, firstChar.isNumber {
+            res = "_" + res
+        }
+        return res
+    }
+
+    private func camelCase(_ snake: String) -> String {
+        escapeKeyword(camelCaseRaw(snake))
     }
 
     private func pascalCase(_ snake: String) -> String {
-        snake.split(separator: "_").map { part in
+        let parts = snake.split(separator: "_")
+        guard !parts.isEmpty else { return snake }
+        return parts.map { part in
             part.prefix(1).uppercased() + part.dropFirst().lowercased()
         }.joined()
     }
@@ -80,11 +92,13 @@ struct OmniBufSwiftPlugin: CodeGenerator {
         let keywords: Set<String> = [
             "associatedtype", "class", "deinit", "enum", "extension", "fileprivate", "func",
             "import", "init", "inout", "internal", "let", "open", "operator", "private",
-            "protocol", "public", "static", "struct", "subscript", "typealias", "var",
+            "protocol", "Protocol", "public", "static", "struct", "subscript", "typealias", "var",
             "break", "case", "continue", "default", "defer", "do", "else", "fallthrough",
             "for", "guard", "if", "in", "repeat", "return", "switch", "where", "while",
-            "as", "Any", "catch", "false", "is", "nil", "rethrows", "super", "self",
-            "Self", "throw", "throws", "true", "try", "description",
+            "as", "Any", "any", "some", "none", "async", "await", "Type", "catch", "false",
+            "is", "nil", "rethrows", "super", "self", "Self", "throw", "throws", "true", "try",
+            "precedencegroup", "borrowing", "consuming", "nonisolated", "isolated", "actor",
+            "macro", "package", "description",
         ]
         return keywords.contains(name) ? "`\(name)`" : name
     }
@@ -94,9 +108,15 @@ struct OmniBufSwiftPlugin: CodeGenerator {
     private func emitEnum(_ e: EnumDescriptor, into out: inout String, indent: String) {
         let name = swiftEnumName(e)
         out += "\(indent)public enum \(name): Int32, Sendable, Equatable, Hashable {\n"
+        var seenRawValues: [Int32: String] = [:]
         for val in e.values {
             let caseName = camelCase(val.name)
-            out += "\(indent)    case \(caseName) = \(val.number)\n"
+            if let existingCase = seenRawValues[val.number] {
+                out += "\(indent)    public static let \(caseName): \(name) = .\(existingCase)\n"
+            } else {
+                seenRawValues[val.number] = caseName
+                out += "\(indent)    case \(caseName) = \(val.number)\n"
+            }
         }
         out += "\(indent)    public init() { self = .\(camelCase(e.values.first?.name ?? "unspecified")) }\n"
         out += "\(indent)}\n\n"
@@ -197,20 +217,24 @@ struct OmniBufSwiftPlugin: CodeGenerator {
         for f in fields {
             out += "\(indent)    public var \(camelCase(f.name)): \(swiftFieldType(f))\n"
         }
-        out += "\n\(indent)    public init(\n"
-        for (i, f) in fields.enumerated() {
-            let comma = i + 1 < fields.count ? "," : ""
-            out += "\(indent)        \(camelCase(f.name)): \(swiftFieldType(f)) = \(defaultValue(f))\(comma)\n"
+        if fields.isEmpty {
+            out += "\n\(indent)    public init() {}\n\n"
+        } else {
+            out += "\n\(indent)    public init(\n"
+            for (i, f) in fields.enumerated() {
+                let comma = i + 1 < fields.count ? "," : ""
+                out += "\(indent)        \(camelCase(f.name)): \(swiftFieldType(f)) = \(defaultValue(f))\(comma)\n"
+            }
+            out += "\(indent)    ) {\n"
+            for f in fields {
+                let p = camelCase(f.name)
+                out += "\(indent)        self.\(p) = \(p)\n"
+            }
+            out += "\(indent)    }\n\n"
+            out += "\(indent)    public init() {\n"
+            out += "\(indent)        self.init(\(camelCase(fields[0].name)): \(defaultValue(fields[0])))\n"
+            out += "\(indent)    }\n\n"
         }
-        out += "\(indent)    ) {\n"
-        for f in fields {
-            let p = camelCase(f.name)
-            out += "\(indent)        self.\(p) = \(p)\n"
-        }
-        out += "\(indent)    }\n\n"
-        out += "\(indent)    public init() {\n"
-        out += "\(indent)        self.init(\(fields.isEmpty ? "" : "\(camelCase(fields[0].name)): \(defaultValue(fields[0]))"))\n"
-        out += "\(indent)    }\n\n"
 
         // Fast O(fields) size hint for single-allocation encoding and 4B length pre-sizing
         out += "\(indent)    @inlinable\n"
@@ -287,30 +311,39 @@ struct OmniBufSwiftPlugin: CodeGenerator {
         out += "\(indent)        }\n"
         out += "\(indent)    }\n\n"
 
-        // Field #0 SchemaMeta
+        // Field #0 SchemaMeta (cycle-safe for self- and mutually-recursive messages)
         out += "\(indent)    public static var omniBufSchemaMeta: SchemaMeta {\n"
+        out += "\(indent)        var visited: Set<String> = []\n"
+        out += "\(indent)        return buildOmniBufSchemaMeta(visited: &visited)\n"
+        out += "\(indent)    }\n\n"
+        out += "\(indent)    public static func buildOmniBufSchemaMeta(visited: inout Set<String>) -> SchemaMeta {\n"
         out += "\(indent)        var fields: [UInt32: String] = [:]\n"
         var hasChildMeta = false
         for f in fields {
             if f.isMap {
                 let vField = f.messageType!.fields[1]
-                if vField.type == .message && vField.messageType!.fullName != msg.fullName {
+                if vField.type == .message {
                     hasChildMeta = true
                 }
-            } else if f.type == .message && f.messageType!.fullName != msg.fullName {
+            } else if f.type == .message {
                 hasChildMeta = true
             }
         }
         out += "\(indent)        \(hasChildMeta ? "var" : "let") children: [UInt32: SchemaMeta] = [:]\n"
+        if hasChildMeta {
+            out += "\(indent)        let typeKey = \"\(msg.fullName)\"\n"
+            out += "\(indent)        let inserted = visited.insert(typeKey).inserted\n"
+            out += "\(indent)        defer { if inserted { visited.remove(typeKey) } }\n"
+        }
         for f in fields {
             out += "\(indent)        fields[\(f.number)] = \"\(f.name)\"\n"
             if f.isMap {
                 let vField = f.messageType!.fields[1]
-                if vField.type == .message && vField.messageType!.fullName != msg.fullName {
-                    out += "\(indent)        children[\(f.number)] = \(swiftTypeName(vField.messageType!)).omniBufSchemaMeta\n"
+                if vField.type == .message {
+                    out += "\(indent)        if inserted { children[\(f.number)] = \(swiftTypeName(vField.messageType!)).buildOmniBufSchemaMeta(visited: &visited) }\n"
                 }
-            } else if f.type == .message && f.messageType!.fullName != msg.fullName {
-                out += "\(indent)        children[\(f.number)] = \(swiftTypeName(f.messageType!)).omniBufSchemaMeta\n"
+            } else if f.type == .message {
+                out += "\(indent)        if inserted { children[\(f.number)] = \(swiftTypeName(f.messageType!)).buildOmniBufSchemaMeta(visited: &visited) }\n"
             }
         }
         out += "\(indent)        return SchemaMeta(typeName: \"\(msg.name)\", fields: fields, children: children)\n"
@@ -344,10 +377,29 @@ struct OmniBufSwiftPlugin: CodeGenerator {
                 emitAppendScalar(vField, expr: "v", into: &out, indent: indent + "            ")
                 out += "\(indent)        }\n"
                 out += "\(indent)    }\n"
+            } else if kField.type == .bool {
+                out += "\(indent)    if deterministic {\n"
+                out += "\(indent)        for k in \(target).keys.sorted(by: { !$0 && $1 }) {\n"
+                emitAppendScalar(kField, expr: "k", into: &out, indent: indent + "            ")
+                emitAppendScalar(vField, expr: "\(target)[k]!", into: &out, indent: indent + "            ")
+                out += "\(indent)        }\n"
+                out += "\(indent)    } else {\n"
+                out += "\(indent)        for (k, v) in \(target) {\n"
+                emitAppendScalar(kField, expr: "k", into: &out, indent: indent + "            ")
+                emitAppendScalar(vField, expr: "v", into: &out, indent: indent + "            ")
+                out += "\(indent)        }\n"
+                out += "\(indent)    }\n"
             } else {
-                out += "\(indent)    for (k, v) in \(target) {\n"
-                emitAppendScalar(kField, expr: "k", into: &out, indent: indent + "        ")
-                emitAppendScalar(vField, expr: "v", into: &out, indent: indent + "        ")
+                out += "\(indent)    if deterministic {\n"
+                out += "\(indent)        for k in \(target).keys.sorted() {\n"
+                emitAppendScalar(kField, expr: "k", into: &out, indent: indent + "            ")
+                emitAppendScalar(vField, expr: "\(target)[k]!", into: &out, indent: indent + "            ")
+                out += "\(indent)        }\n"
+                out += "\(indent)    } else {\n"
+                out += "\(indent)        for (k, v) in \(target) {\n"
+                emitAppendScalar(kField, expr: "k", into: &out, indent: indent + "            ")
+                emitAppendScalar(vField, expr: "v", into: &out, indent: indent + "            ")
+                out += "\(indent)        }\n"
                 out += "\(indent)    }\n"
             }
             out += "\(indent)    w.backpatchLength2(at: lenPos)\n"
@@ -489,6 +541,7 @@ struct OmniBufSwiftPlugin: CodeGenerator {
             out += "\(indent)        throw OmniBufError.parse(\"field \(f.number) map type mismatch\")\n"
             out += "\(indent)    }\n"
             out += "\(indent)    try budget.addElements(count)\n"
+            out += "\(indent)    try budget.addAlloc(count: count, elementBytes: 32)\n"
             out += "\(indent)    var mr = mr0\n"
             out += "\(indent)    for _ in 0..<count {\n"
             out += "\(indent)        let k = \(readScalarExpr(kField, reader: "mr"))\n"
@@ -503,6 +556,11 @@ struct OmniBufSwiftPlugin: CodeGenerator {
                 out += "\(indent)        try v.mergeOmniBuf(from: slice, depth: valDepth, budget: &budget)\n"
             } else {
                 out += "\(indent)        let v = \(readScalarExpr(vField, reader: "mr"))\n"
+                if vField.type == .string {
+                    out += "\(indent)        try budget.addAlloc(v.utf8.count)\n"
+                } else if vField.type == .bytes {
+                    out += "\(indent)        try budget.addAlloc(v.count)\n"
+                }
             }
             out += "\(indent)        self.\(p)[k] = v\n"
             out += "\(indent)    }\n"
@@ -511,6 +569,10 @@ struct OmniBufSwiftPlugin: CodeGenerator {
         }
 
         if f.isRepeated {
+            let elemType = swiftSingularBaseType(f)
+            let elemBytesExpr = f.type == .message
+                ? "max(MemoryLayout<\(elemType)>.stride, 16)"
+                : "max(MemoryLayout<\(elemType)>.stride, 1)"
             out += "\(indent)    guard wt == WireType.wireArray else {\n"
             out += "\(indent)        try r.validateValue(wireType: wt, inCollection: false, depth: depth, maxDepth: budget.maxDepth)\n"
             out += "\(indent)        continue\n"
@@ -523,8 +585,11 @@ struct OmniBufSwiftPlugin: CodeGenerator {
             out += "\(indent)        throw OmniBufError.parse(\"field \(f.number) array element type mismatch\")\n"
             out += "\(indent)    }\n"
             out += "\(indent)    try budget.addElements(count)\n"
+            out += "\(indent)    try budget.addAlloc(count: count, elementBytes: \(elemBytesExpr))\n"
+            out += "\(indent)    let (newCap, capOverflow) = self.\(p).count.addingReportingOverflow(count)\n"
+            out += "\(indent)    if capOverflow { throw OmniBufError.allocationLimitExceeded(\"array capacity overflow\") }\n"
             out += "\(indent)    var er = er0\n"
-            out += "\(indent)    self.\(p).reserveCapacity(self.\(p).count &+ count)\n"
+            out += "\(indent)    self.\(p).reserveCapacity(newCap)\n"
             out += "\(indent)    for _ in 0..<count {\n"
             if f.type == .message {
                 out += "\(indent)        let elemDepth = arrDepth &+ 1\n"
@@ -611,12 +676,16 @@ struct OmniBufSwiftPlugin: CodeGenerator {
         let opaqueName = "Opaque\(name)"
         let fields = msg.fields.sorted { $0.number < $1.number }
         let maxFieldNum = fields.map(\.number).max() ?? 0
+        let hasHighFields = fields.contains { $0.number >= 64 }
 
         out += "\(indent)public struct \(opaqueName): Sendable {\n"
         out += "\(indent)    public let raw: [UInt8]\n"
         out += "\(indent)    public let offset: Int\n"
         out += "\(indent)    public let length: Int\n"
         out += "\(indent)    @usableFromInline internal var dirtyMask: UInt64 = 0\n"
+        if hasHighFields {
+            out += "\(indent)    @usableFromInline internal var dirtyHigh: Set<UInt32> = []\n"
+        }
         for f in fields {
             out += "\(indent)    @usableFromInline internal var dirty_\(f.name): \(swiftFieldType(f)) = \(defaultValue(f))\n"
         }
@@ -628,6 +697,7 @@ struct OmniBufSwiftPlugin: CodeGenerator {
         out += "\(indent)    }\n\n"
         out += "\(indent)    @inlinable\n"
         out += "\(indent)    public init(raw: [UInt8], offset: Int, length: Int) {\n"
+        out += "\(indent)        precondition(offset >= 0 && length >= 0 && offset <= raw.count && length <= raw.count - offset, \"\(opaqueName) slice out of bounds\")\n"
         out += "\(indent)        self.raw = raw\n"
         out += "\(indent)        self.offset = offset\n"
         out += "\(indent)        self.length = length\n"
@@ -644,38 +714,39 @@ struct OmniBufSwiftPlugin: CodeGenerator {
         for f in fields {
             let pName = pascalCase(f.name)
             let num = f.number
-            let bitExpr = num < 64 ? "(1 &<< \(num))" : "0"
+            let isDirtyExpr = num < 64 ? "(dirtyMask & (1 &<< \(num))) != 0" : "dirtyHigh.contains(\(num))"
+            let markDirtyStmt = num < 64 ? "dirtyMask |= (1 &<< \(num))" : "dirtyHigh.insert(\(num))"
 
             if f.isMap {
                 let entry = f.messageType!
                 if entry.fields[0].type == .string && entry.fields[1].type == .uint64 {
                     out += "\(indent)    @inlinable\n"
                     out += "\(indent)    public func lookup\(pName)(_ key: String) -> UInt64? {\n"
-                    out += "\(indent)        if (dirtyMask & \(bitExpr)) != 0 { return dirty_\(f.name)[key] }\n"
+                    out += "\(indent)        if \(isDirtyExpr) { return dirty_\(f.name)[key] }\n"
                     out += "\(indent)        return withSlice { OpaqueWire.lookupMapStringUint64(in: $0, fieldNumber: \(num), key: key) }\n"
                     out += "\(indent)    }\n"
                 }
                 out += "\(indent)    @inlinable\n"
                 out += "\(indent)    public mutating func set\(pName)(_ value: \(swiftFieldType(f))) {\n"
                 out += "\(indent)        dirty_\(f.name) = value\n"
-                out += "\(indent)        dirtyMask |= \(bitExpr)\n"
+                out += "\(indent)        \(markDirtyStmt)\n"
                 out += "\(indent)    }\n"
             } else if f.isRepeated {
                 out += "\(indent)    @inlinable\n"
-                out += "\(indent)    public var \(camelCase(f.name))Count: Int {\n"
-                out += "\(indent)        if (dirtyMask & \(bitExpr)) != 0 { return dirty_\(f.name).count }\n"
+                out += "\(indent)    public var \(camelCaseRaw(f.name))Count: Int {\n"
+                out += "\(indent)        if \(isDirtyExpr) { return dirty_\(f.name).count }\n"
                 out += "\(indent)        return withSlice { OpaqueWire.arrayCount(in: $0, fieldNumber: \(num), expectedElemType: \(wireTypeExpr(f))) }\n"
                 out += "\(indent)    }\n"
                 out += "\(indent)    @inlinable\n"
                 out += "\(indent)    public mutating func set\(pName)(_ value: \(swiftFieldType(f))) {\n"
                 out += "\(indent)        dirty_\(f.name) = value\n"
-                out += "\(indent)        dirtyMask |= \(bitExpr)\n"
+                out += "\(indent)        \(markDirtyStmt)\n"
                 out += "\(indent)    }\n"
             } else if f.type == .message {
                 let subName = swiftTypeName(f.messageType!)
                 out += "\(indent)    @inlinable\n"
                 out += "\(indent)    public func get\(pName)() -> Opaque\(subName) {\n"
-                out += "\(indent)        if (dirtyMask & \(bitExpr)) != 0 {\n"
+                out += "\(indent)        if \(isDirtyExpr) {\n"
                 out += "\(indent)            return Opaque\(subName)(dirty_\(f.name)?.marshalOmniBuf() ?? [])\n"
                 out += "\(indent)        }\n"
                 out += "\(indent)        return withSlice { slice in\n"
@@ -691,7 +762,7 @@ struct OmniBufSwiftPlugin: CodeGenerator {
                 out += "\(indent)    @inlinable\n"
                 out += "\(indent)    public mutating func set\(pName)(_ value: \(subName)?) {\n"
                 out += "\(indent)        dirty_\(f.name) = value\n"
-                out += "\(indent)        dirtyMask |= \(bitExpr)\n"
+                out += "\(indent)        \(markDirtyStmt)\n"
                 out += "\(indent)    }\n"
             } else {
                 let readFn: String
@@ -713,20 +784,20 @@ struct OmniBufSwiftPlugin: CodeGenerator {
                 }
                 out += "\(indent)    @inlinable\n"
                 out += "\(indent)    public func get\(pName)() -> \(swiftFieldType(f)) {\n"
-                out += "\(indent)        if (dirtyMask & \(bitExpr)) != 0 { return dirty_\(f.name) }\n"
+                out += "\(indent)        if \(isDirtyExpr) { return dirty_\(f.name) }\n"
                 out += "\(indent)        return withSlice { OpaqueWire.\(readFn)(in: $0, fieldNumber: \(num)) }\n"
                 out += "\(indent)    }\n"
                 out += "\(indent)    @inlinable\n"
                 out += "\(indent)    public mutating func set\(pName)(_ value: \(swiftFieldType(f))) {\n"
                 out += "\(indent)        dirty_\(f.name) = value\n"
-                out += "\(indent)        dirtyMask |= \(bitExpr)\n"
+                out += "\(indent)        \(markDirtyStmt)\n"
                 out += "\(indent)    }\n"
             }
         }
 
         // Dirty field encoder + marshal / tryMarshal
         out += "\n\(indent)    @inlinable\n"
-        out += "\(indent)    internal func appendDirtyField(_ fnum: UInt16, into w: inout OmniBufWriter) {\n"
+        out += "\(indent)    internal func appendDirtyField(_ fnum: UInt32, into w: inout OmniBufWriter) {\n"
         out += "\(indent)        let deterministic = true\n"
         out += "\(indent)        _ = deterministic\n"
         out += "\(indent)        switch fnum {\n"
@@ -739,11 +810,17 @@ struct OmniBufSwiftPlugin: CodeGenerator {
         out += "\(indent)        }\n"
         out += "\(indent)    }\n\n"
 
+        let cleanCond = hasHighFields ? "dirtyMask == 0 && dirtyHigh.isEmpty" : "dirtyMask == 0"
+        let dirtyHighArg = hasHighFields ? ", dirtyHigh: dirtyHigh" : ""
+
         out += "\(indent)    @inlinable\n"
         out += "\(indent)    public func marshal() -> [UInt8] {\n"
-        out += "\(indent)        if dirtyMask == 0 { return raw }\n"
+        out += "\(indent)        if \(cleanCond) {\n"
+        out += "\(indent)            if offset == 0 && length == raw.count { return raw }\n"
+        out += "\(indent)            return Array(raw[offset..<(offset + length)])\n"
+        out += "\(indent)        }\n"
         out += "\(indent)        var dst: [UInt8] = []\n"
-        out += "\(indent)        OpaqueWire.spliceFields(into: &dst, raw: raw, dirtyMask: dirtyMask, maxField: \(maxFieldNum)) { w, fnum in\n"
+        out += "\(indent)        OpaqueWire.spliceFields(into: &dst, raw: raw, offset: offset, length: length, dirtyMask: dirtyMask\(dirtyHighArg), maxField: \(maxFieldNum)) { w, fnum in\n"
         out += "\(indent)            self.appendDirtyField(fnum, into: &w)\n"
         out += "\(indent)        }\n"
         out += "\(indent)        return dst\n"
@@ -752,7 +829,7 @@ struct OmniBufSwiftPlugin: CodeGenerator {
         out += "\(indent)    @inlinable\n"
         out += "\(indent)    public func tryMarshal() throws -> [UInt8] {\n"
         out += "\(indent)        var dst: [UInt8] = []\n"
-        out += "\(indent)        try OpaqueWire.trySpliceFields(into: &dst, raw: raw, dirtyMask: dirtyMask, maxField: \(maxFieldNum)) { w, fnum in\n"
+        out += "\(indent)        try OpaqueWire.trySpliceFields(into: &dst, raw: raw, offset: offset, length: length, dirtyMask: dirtyMask\(dirtyHighArg), maxField: \(maxFieldNum)) { w, fnum in\n"
         out += "\(indent)            self.appendDirtyField(fnum, into: &w)\n"
         out += "\(indent)        }\n"
         out += "\(indent)        return dst\n"

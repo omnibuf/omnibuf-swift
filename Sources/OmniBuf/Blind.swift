@@ -192,7 +192,7 @@ private func decodeBlindSegments(
     var seenFields = Set<UInt32>()
     var fieldShapes: [UInt32: BlindShape] = [:]
     var numericMap: [UInt32: BlindValue] = [:]
-    var subMsgSegments: [UInt32: [[UInt8]]] = [:]
+    var subMsgSegments: [UInt32: [UnsafeBufferPointer<UInt8>]] = [:]
 
     for seg in segments {
         var r = OmniBufReader(seg)
@@ -203,6 +203,8 @@ private func decodeBlindSegments(
                 continue
             }
             if !seenFields.contains(fnum) {
+                try budget.addElements(1)
+                try budget.addAlloc(64)
                 seenFields.insert(fnum)
                 fieldOrder.append(fnum)
             }
@@ -221,10 +223,9 @@ private func decodeBlindSegments(
                     fieldShapes[fnum] = incomingShape
                 }
                 let slice = try r.readLenSlice()
-                try budget.addAlloc(slice.count)
-                var segList = subMsgSegments[fnum] ?? []
-                segList.append(Array(slice))
-                subMsgSegments[fnum] = segList
+                try budget.addElements(1)
+                try budget.addAlloc(16)
+                subMsgSegments[fnum, default: []].append(slice)
                 continue
             }
 
@@ -263,10 +264,10 @@ private func decodeBlindSegments(
     }
 
     // Decode accumulated submessages keeping each segment boundary intact
-    for (fnum, segArrays) in subMsgSegments {
+    for (fnum, segSlices) in subMsgSegments {
         let childLayers = resolveChildLayers(fnum, layers: effectiveLayers)
-        let subObj = try decodeBlindSegmentArrays(
-            segArrays,
+        let subObj = try decodeBlindSegments(
+            segSlices,
             inheritedLayers: childLayers,
             depth: depth &+ 1,
             budget: &budget
@@ -291,29 +292,6 @@ private func decodeBlindSegments(
     }
 
     return result
-}
-
-private func decodeBlindSegmentArrays(
-    _ arrays: [[UInt8]],
-    inheritedLayers: [SchemaMeta],
-    depth: Int,
-    budget: inout DecodeBudget
-) throws -> [String: BlindValue] {
-    func invoke(
-        _ index: Int,
-        _ buffers: inout [UnsafeBufferPointer<UInt8>]
-    ) throws -> [String: BlindValue] {
-        if index == arrays.count {
-            return try decodeBlindSegments(buffers, inheritedLayers: inheritedLayers, depth: depth, budget: &budget)
-        }
-        return try arrays[index].withUnsafeBufferPointer { buf in
-            buffers.append(buf)
-            return try invoke(index &+ 1, &buffers)
-        }
-    }
-    var buffers: [UnsafeBufferPointer<UInt8>] = []
-    buffers.reserveCapacity(arrays.count)
-    return try invoke(0, &buffers)
 }
 
 private func decodeBlindValue(
@@ -376,7 +354,7 @@ private func decodeBlindValue(
         let body = try r.readLenSlice(minLen: 2)
         let (elemWT, count, elemReader) = try OmniBufReader.parseArrayBody(body)
         try budget.addElements(count)
-        try budget.addAlloc(count * 32)
+        try budget.addAlloc(count: count, elementBytes: 32)
         var er = elemReader
         var items: [BlindValue] = []
         items.reserveCapacity(count)
@@ -410,7 +388,7 @@ private func decodeBlindValue(
         let body = try r.readLenSlice(minLen: 3)
         let (keyWT, valWT, count, mapReader) = try OmniBufReader.parseMapBody(body)
         try budget.addElements(count)
-        try budget.addAlloc(count * 64)
+        try budget.addAlloc(count: count, elementBytes: 64)
         var mr = mapReader
         var mapObj: [String: BlindValue] = [:]
         mapObj.reserveCapacity(count)
