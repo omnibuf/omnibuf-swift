@@ -47,11 +47,8 @@ jobs:
           GOBIN="$HOME/.local/bin" mise exec -- go install github.com/omnibuf/omnibuf-go/cmd/conformance-runner@71dad83aadd7dc65401d662521d34cfaeb1011ab
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      - name: Build release and tests
-        run: swift build -c release --build-tests
-
       - name: Run Swift tests
-        run: swift test -c release --skip-build
+        run: swift test
 
       - name: Run conformance suite
         run: just conformance

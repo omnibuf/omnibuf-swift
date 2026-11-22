@@ -44,7 +44,7 @@ jobs:
 
       - name: Run tests and conformance
         run: |
-          swift test -c release
+          swift test
           just conformance
 
   build-plugin:
