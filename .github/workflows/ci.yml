@@ -28,6 +28,14 @@ jobs:
         with:
           swift-version: "6.2"
 
+      - name: Cache SwiftPM build artifacts
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: ${{ runner.os }}-swift-6.2-${{ hashFiles('Package.swift', 'Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-swift-6.2-
+
       - name: Install tools via mise
         uses: jdx/mise-action@v2
         with:
@@ -39,11 +47,11 @@ jobs:
           GOBIN="$HOME/.local/bin" mise exec -- go install github.com/omnibuf/omnibuf-go/cmd/conformance-runner@71dad83aadd7dc65401d662521d34cfaeb1011ab
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      - name: Build release
-        run: swift build -c release
+      - name: Build release and tests
+        run: swift build -c release --build-tests
 
       - name: Run Swift tests
-        run: swift test
+        run: swift test -c release --skip-build
 
       - name: Run conformance suite
         run: just conformance
