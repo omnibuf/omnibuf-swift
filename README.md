@@ -75,6 +75,10 @@ view.setSequence(view.getSequence() + 1)
 let updatedPacket = view.marshal()
 ```
 
+## Benchmarks
+
+Swift benchmark results, methodology, and cross-language comparisons live at [omnibuf.com/benchmarks?lang=swift](https://omnibuf.com/benchmarks?lang=swift) (all languages at [omnibuf.com/benchmarks](https://omnibuf.com/benchmarks)). Run `just bench` locally to regenerate [`testdata/benchmarks.json`](testdata/benchmarks.json).
+
 ## Development
 
 ```bash
