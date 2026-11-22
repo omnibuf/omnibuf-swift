@@ -13,7 +13,7 @@ concurrency:
 jobs:
   verify:
     name: Verify Release
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -98,7 +98,7 @@ jobs:
     name: Publish GitHub Release
     needs: build-plugin
     if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
     steps:
