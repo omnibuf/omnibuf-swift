@@ -16,8 +16,7 @@ public enum OmniBufGRPC {
     public static let selfDescribingContentType = "application/grpc+x-omnibuf"
 }
 
-/// Detached gRPC message serializer for `OmniBufMessage` types.
-/// Matches the `grpc-swift` `MessageSerializer` shape without coupling core `OmniBuf` to `grpc-swift`.
+/// gRPC message serializer for `OmniBufMessage` types (`grpc-swift` `MessageSerializer` shape).
 public struct OmniBufGRPCSerializer<Message: OmniBufMessage>: Sendable, Equatable {
     /// Encoding options applied by `serialize(_:)`.
     public let encodeOptions: EncodeOptions
@@ -55,8 +54,7 @@ public struct OmniBufGRPCSerializer<Message: OmniBufMessage>: Sendable, Equatabl
     }
 }
 
-/// Detached gRPC message deserializer for `OmniBufMessage` types.
-/// Matches the `grpc-swift` `MessageDeserializer` shape without coupling core `OmniBuf` to `grpc-swift`.
+/// gRPC message deserializer for `OmniBufMessage` types (`grpc-swift` `MessageDeserializer` shape).
 public struct OmniBufGRPCDeserializer<Message: OmniBufMessage>: Sendable, Equatable {
     /// Decoding limits applied by `deserialize(_:)`.
     public let decodeOptions: DecodeOptions

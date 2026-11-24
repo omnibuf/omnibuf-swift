@@ -1,8 +1,7 @@
 import Foundation
 import OmniBuf
 
-/// Detached Connect RPC codec for `OmniBufMessage` types.
-/// Matches the `connect-swift` `Codec` shape without coupling core `OmniBuf` to `connect-swift`.
+/// Connect RPC codec for `OmniBufMessage` types (`connect-swift` `Codec` shape).
 public struct OmniBufConnectCodec: Sendable, Equatable {
     /// Standard Connect codec name for compact OmniBuf payloads.
     public static let compactName = "omnibuf"
