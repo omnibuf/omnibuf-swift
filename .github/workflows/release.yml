@@ -18,12 +18,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Import Swift GPG signing keys
-        if: runner.os == 'Linux'
-        run: |
-          curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 https://www.swift.org/keys/all-keys.asc -o /tmp/swift-keys.asc
-          gpg --import /tmp/swift-keys.asc
-
       - name: Setup Swift
         uses: swift-actions/setup-swift@v3
         with:
@@ -68,12 +62,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
-
-      - name: Import Swift GPG signing keys
-        if: runner.os == 'Linux'
-        run: |
-          curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 https://www.swift.org/keys/all-keys.asc -o /tmp/swift-keys.asc
-          gpg --import /tmp/swift-keys.asc
 
       - name: Setup Swift
         uses: swift-actions/setup-swift@v3
