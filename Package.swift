@@ -69,7 +69,9 @@ let package = Package(
             dependencies: [
                 "OmniBuf",
                 "OmniBufProtobuf",
+                "protoc-gen-omnibuf-swift",
                 .product(name: "SwiftProtobuf", package: "swift-protobuf"),
+                .product(name: "SwiftProtobufPluginLibrary", package: "swift-protobuf"),
             ]
         ),
     ]

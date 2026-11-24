@@ -283,7 +283,7 @@ public final class OmniBufStructSchema<Root: Sendable>: @unchecked Sendable {
                     throw OmniBufError.parse("Field #0 must have WireSubMsg (12), got \(wt)")
                 }
                 let slice = try r.readLenSlice()
-                _ = try SchemaMeta.validateSlice(slice, depth: depth &+ 1, maxDepth: budget.maxDepth)
+                try SchemaMeta.validateSlice(slice, depth: depth &+ 1, budget: &budget)
                 continue
             }
             if let codec = byFieldNumber[fnum] {
@@ -569,9 +569,7 @@ public enum Field {
                     try r.validateValue(wireType: wt, inCollection: false, depth: depth, maxDepth: budget.maxDepth)
                     return
                 }
-                let s = try r.readString()
-                try budget.addAlloc(s.utf8.count)
-                root[keyPath: kp] = s
+                root[keyPath: kp] = try r.readString(budget: &budget)
             }
         )
     }
@@ -594,9 +592,7 @@ public enum Field {
                     try r.validateValue(wireType: wt, inCollection: false, depth: depth, maxDepth: budget.maxDepth)
                     return
                 }
-                let b = try r.readBytes()
-                try budget.addAlloc(b.count)
-                root[keyPath: kp] = b
+                root[keyPath: kp] = try r.readBytes(budget: &budget)
             }
         )
     }
@@ -722,8 +718,7 @@ public enum Field {
                 var er = er0
                 root[keyPath: kp].reserveCapacity(newCap)
                 for _ in 0..<count {
-                    let s = try er.readString()
-                    try budget.addAlloc(s.utf8.count)
+                    let s = try er.readString(budget: &budget)
                     root[keyPath: kp].append(s)
                 }
                 guard er.isAtEnd else {
@@ -901,8 +896,7 @@ public enum Field {
                 try budget.addAlloc(count: count, elementBytes: 32)
                 var mr = mr0
                 for _ in 0..<count {
-                    let k = try mr.readString()
-                    try budget.addAlloc(k.utf8.count)
+                    let k = try mr.readString(budget: &budget)
                     let v = try mr.readVarint()
                     root[keyPath: kp][k] = v
                 }

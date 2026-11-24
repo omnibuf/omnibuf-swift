@@ -331,12 +331,10 @@ private func decodeBlindValue(
     case WireType.wireFloat64:
         return (.float64(try r.readFloat64()), .scalar(normWT))
     case WireType.wireString:
-        let s = try r.readString()
-        try budget.addAlloc(s.utf8.count)
+        let s = try r.readString(budget: &budget)
         return (.string(s), .scalar(normWT))
     case WireType.wireBytes:
-        let b = try r.readBytes()
-        try budget.addAlloc(b.count)
+        let b = try r.readBytes(budget: &budget)
         return (.bytes(b), .scalar(normWT))
     case WireType.wireSubMsg:
         let nextDepth = depth &+ 1
@@ -445,9 +443,7 @@ private func decodeBlindMapKey(
     case WireType.wireSfixed64:
         return String(try r.readSfixed64())
     case WireType.wireString:
-        let s = try r.readString()
-        try budget.addAlloc(s.utf8.count)
-        return s
+        return try r.readString(budget: &budget)
     default:
         throw OmniBufError.parse("invalid WireMap key type \(keyType)")
     }

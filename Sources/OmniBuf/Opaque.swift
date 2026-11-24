@@ -381,7 +381,7 @@ public enum OpaqueWire {
         dirtyMask: UInt64,
         dirtyHigh: Set<UInt32> = [],
         maxField: UInt32,
-        appendDirty: (inout OmniBufWriter, UInt32) -> Void
+        appendDirty: (inout OmniBufWriter, UInt32) throws -> Void
     ) throws {
         let sliceLen = length ?? (raw.count - offset)
         precondition(
@@ -423,7 +423,7 @@ public enum OpaqueWire {
                             writer.appendRaw(b.advanced(by: cleanStart), count: fieldStart &- cleanStart)
                         }
                         if (emitted & bit) == 0 {
-                            appendDirty(&writer, fnum)
+                            try appendDirty(&writer, fnum)
                             emitted |= bit
                         }
                         cleanStart = fieldEnd
@@ -435,7 +435,7 @@ public enum OpaqueWire {
                         writer.appendRaw(b.advanced(by: cleanStart), count: fieldStart &- cleanStart)
                     }
                     if emittedHigh.insert(fnum).inserted {
-                        appendDirty(&writer, fnum)
+                        try appendDirty(&writer, fnum)
                     }
                     cleanStart = fieldEnd
                 }
@@ -451,7 +451,7 @@ public enum OpaqueWire {
                 if limit >= 1 {
                     for fnum in UInt32(1)...limit {
                         if (rem & (1 &<< UInt64(fnum))) != 0 {
-                            appendDirty(&writer, fnum)
+                            try appendDirty(&writer, fnum)
                         }
                     }
                 }
@@ -459,7 +459,7 @@ public enum OpaqueWire {
 
             if !dirtyHigh.isEmpty {
                 for fnum in dirtyHigh.sorted() where fnum >= 64 && !emittedHigh.contains(fnum) {
-                    appendDirty(&writer, fnum)
+                    try appendDirty(&writer, fnum)
                 }
             }
         }

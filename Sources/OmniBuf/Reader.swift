@@ -269,10 +269,32 @@ public struct OmniBufReader {
         return try makeValidatedString(ptr, count: slice.count)
     }
 
+    /// Reads a UTF-8 `String`, charging `budget` before validating or allocating the string.
+    @inlinable
+    @inline(__always)
+    public mutating func readString(budget: inout DecodeBudget) throws -> String {
+        let slice = try readLenSlice()
+        try budget.addAlloc(slice.count)
+        guard let ptr = slice.baseAddress, !slice.isEmpty else {
+            return ""
+        }
+        return try makeValidatedString(ptr, count: slice.count)
+    }
+
     @inlinable
     @inline(__always)
     public mutating func readBytes() throws -> [UInt8] {
         let slice = try readLenSlice()
+        if slice.isEmpty { return [] }
+        return Array(slice)
+    }
+
+    /// Reads a `[UInt8]` payload, charging `budget` before allocating the array.
+    @inlinable
+    @inline(__always)
+    public mutating func readBytes(budget: inout DecodeBudget) throws -> [UInt8] {
+        let slice = try readLenSlice()
+        try budget.addAlloc(slice.count)
         if slice.isEmpty { return [] }
         return Array(slice)
     }

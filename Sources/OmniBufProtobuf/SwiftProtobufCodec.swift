@@ -16,16 +16,17 @@ public enum OmniBufProtobuf {
         options: EncodeOptions = .default,
         schemaMeta: SchemaMeta? = nil
     ) throws -> [UInt8] {
-        var writer = OmniBufWriter(initialCapacity: 256)
+        let box = OmniBufWriterBox(initialCapacity: 256)
         if options.selfDescribing {
             if let meta = schemaMeta {
-                meta.appendField0(to: &writer)
+                meta.appendField0(to: &box.writer)
             } else if let provider = M.self as? any OmniBufSchemaMetaProviding.Type {
-                provider.omniBufSchemaMeta.appendField0(to: &writer)
+                provider.omniBufSchemaMeta.appendField0(to: &box.writer)
             }
         }
-        try encodeBody(message, into: &writer, options: options)
-        return writer.toBytes()
+        var visitor = OmniBufVisitor(box: box, options: options, depth: 0)
+        try message.traverse(visitor: &visitor)
+        return box.writer.toBytes()
     }
 
     /// Encodes a `SwiftProtobuf.Message` body (without Field #0) into `writer`.
@@ -34,9 +35,12 @@ public enum OmniBufProtobuf {
         into writer: inout OmniBufWriter,
         options: EncodeOptions = .default
     ) throws {
-        var visitor = OmniBufVisitor(options: options)
+        let box = OmniBufWriterBox(initialCapacity: 256)
+        var visitor = OmniBufVisitor(box: box, options: options, depth: 0)
         try message.traverse(visitor: &visitor)
-        visitor.flush(into: &writer)
+        box.writer.withUnsafeBytes { buf in
+            writer.appendRaw(buf)
+        }
     }
 
     /// Decodes OmniBuf bytes into a fresh `SwiftProtobuf.Message` (replace mode).
@@ -95,27 +99,27 @@ public enum OmniBufProtobuf {
 
 // MARK: - SwiftProtobuf.Visitor -> OmniBufWriter
 
-private struct OmniBufVisitor: SwiftProtobuf.Visitor {
-    private var bytes: [UInt8] = []
-    private let options: EncodeOptions
+private final class OmniBufWriterBox {
+    var writer: OmniBufWriter
 
-    init(options: EncodeOptions) {
-        self.options = options
-        self.bytes.reserveCapacity(256)
+    init(initialCapacity: Int = 256) {
+        self.writer = OmniBufWriter(initialCapacity: initialCapacity)
     }
+}
 
-    func flush(into writer: inout OmniBufWriter) {
-        if !bytes.isEmpty {
-            writer.appendRaw(bytes)
-        }
+private struct OmniBufVisitor: SwiftProtobuf.Visitor {
+    private let box: OmniBufWriterBox
+    private let options: EncodeOptions
+    private let depth: Int
+
+    init(box: OmniBufWriterBox, options: EncodeOptions, depth: Int = 0) {
+        self.box = box
+        self.options = options
+        self.depth = depth
     }
 
     private mutating func write(_ body: (inout OmniBufWriter) throws -> Void) rethrows {
-        var w = OmniBufWriter(initialCapacity: 64)
-        try body(&w)
-        w.withUnsafeBytes { buf in
-            bytes.append(contentsOf: buf)
-        }
+        try body(&box.writer)
     }
 
     // MARK: Singular Scalars
@@ -234,13 +238,15 @@ private struct OmniBufVisitor: SwiftProtobuf.Visitor {
     }
 
     mutating func visitSingularMessageField<M: SwiftProtobuf.Message>(value: M, fieldNumber: Int) throws {
-        let opts = options
-        try write { w in
-            w.appendTag(fieldNumber: UInt32(fieldNumber), wireType: WireType.wireSubMsg)
-            let lenPos = w.reserveLength2()
-            try OmniBufProtobuf.encodeBody(value, into: &w, options: opts)
-            w.backpatchLength2(at: lenPos)
+        let nextDepth = depth &+ 1
+        guard nextDepth <= WireType.maxNestingDepth else {
+            throw OmniBufError.depthLimitExceeded(nextDepth)
         }
+        box.writer.appendTag(fieldNumber: UInt32(fieldNumber), wireType: WireType.wireSubMsg)
+        let lenPos = box.writer.reserveLength2()
+        var subVisitor = OmniBufVisitor(box: box, options: options, depth: nextDepth)
+        try value.traverse(visitor: &subVisitor)
+        box.writer.backpatchLength2(at: lenPos)
     }
 
     mutating func visitSingularGroupField<G: SwiftProtobuf.Message>(value: G, fieldNumber: Int) throws {
@@ -408,14 +414,26 @@ private struct OmniBufVisitor: SwiftProtobuf.Visitor {
     }
 
     mutating func visitRepeatedMessageField<M: SwiftProtobuf.Message>(value: [M], fieldNumber: Int) throws {
-        let opts = options
-        try writeArray(fieldNumber: fieldNumber, elemType: WireType.wireSubMsg, count: value.count) { w in
-            for item in value {
-                let elemLenPos = w.reserveLength2()
-                try OmniBufProtobuf.encodeBody(item, into: &w, options: opts)
-                w.backpatchLength2(at: elemLenPos)
-            }
+        guard !value.isEmpty else { return }
+        let arrDepth = depth &+ 1
+        guard arrDepth <= WireType.maxNestingDepth else {
+            throw OmniBufError.depthLimitExceeded(arrDepth)
         }
+        let elemDepth = arrDepth &+ 1
+        guard elemDepth <= WireType.maxNestingDepth else {
+            throw OmniBufError.depthLimitExceeded(elemDepth)
+        }
+        box.writer.appendTag(fieldNumber: UInt32(fieldNumber), wireType: WireType.wireArray)
+        let lenPos = box.writer.reserveLength2()
+        box.writer.appendByte(WireType.wireSubMsg)
+        box.writer.appendVarint(UInt64(value.count))
+        for item in value {
+            let elemLenPos = box.writer.reserveLength2()
+            var subVisitor = OmniBufVisitor(box: box, options: options, depth: elemDepth)
+            try item.traverse(visitor: &subVisitor)
+            box.writer.backpatchLength2(at: elemLenPos)
+        }
+        box.writer.backpatchLength2(at: lenPos)
     }
 
     mutating func visitRepeatedGroupField<G: SwiftProtobuf.Message>(value: [G], fieldNumber: Int) throws {
@@ -475,22 +493,28 @@ private struct OmniBufVisitor: SwiftProtobuf.Visitor {
         fieldNumber: Int
     ) throws {
         guard !value.isEmpty else { return }
-        let keyWT = try wireTypeForFieldType(KeyType.self)
-        let opts = options
-        try write { w in
-            w.appendTag(fieldNumber: UInt32(fieldNumber), wireType: WireType.wireMap)
-            let lenPos = w.reserveLength2()
-            w.appendTwoBytes(keyWT, WireType.wireSubMsg)
-            w.appendVarint(UInt64(value.count))
-            let keys = sortedMapKeys(Array(value.keys), keyType: KeyType.self, deterministic: opts.deterministic)
-            for k in keys {
-                try appendMapScalar(k, fieldType: KeyType.self, to: &w)
-                let msgLenPos = w.reserveLength2()
-                try OmniBufProtobuf.encodeBody(value[k]!, into: &w, options: opts)
-                w.backpatchLength2(at: msgLenPos)
-            }
-            w.backpatchLength2(at: lenPos)
+        let mapDepth = depth &+ 1
+        guard mapDepth <= WireType.maxNestingDepth else {
+            throw OmniBufError.depthLimitExceeded(mapDepth)
         }
+        let valDepth = mapDepth &+ 1
+        guard valDepth <= WireType.maxNestingDepth else {
+            throw OmniBufError.depthLimitExceeded(valDepth)
+        }
+        let keyWT = try wireTypeForFieldType(KeyType.self)
+        box.writer.appendTag(fieldNumber: UInt32(fieldNumber), wireType: WireType.wireMap)
+        let lenPos = box.writer.reserveLength2()
+        box.writer.appendTwoBytes(keyWT, WireType.wireSubMsg)
+        box.writer.appendVarint(UInt64(value.count))
+        let keys = sortedMapKeys(Array(value.keys), keyType: KeyType.self, deterministic: options.deterministic)
+        for k in keys {
+            try appendMapScalar(k, fieldType: KeyType.self, to: &box.writer)
+            let msgLenPos = box.writer.reserveLength2()
+            var subVisitor = OmniBufVisitor(box: box, options: options, depth: valDepth)
+            try value[k]!.traverse(visitor: &subVisitor)
+            box.writer.backpatchLength2(at: msgLenPos)
+        }
+        box.writer.backpatchLength2(at: lenPos)
     }
 
     mutating func visitExtensionFields(fields: ExtensionFieldValueSet, start: Int, end: Int) throws {}
@@ -597,7 +621,7 @@ private struct OmniBufSwiftDecoder: SwiftProtobuf.Decoder {
                     throw OmniBufError.parse("Field #0 must have WireSubMsg (12), got \(wt)")
                 }
                 let slice = try reader.readLenSlice()
-                _ = try SchemaMeta.validateSlice(slice, depth: depth &+ 1, maxDepth: budget.maxDepth)
+                try SchemaMeta.validateSlice(slice, depth: depth &+ 1, budget: &budget)
                 continue
             }
             currentWireType = wt
@@ -745,15 +769,11 @@ private struct OmniBufSwiftDecoder: SwiftProtobuf.Decoder {
 
     mutating func decodeSingularStringField(value: inout String) throws {
         guard try expectOrSkip(WireType.wireString) else { return }
-        let s = try reader.readString()
-        try budget.addAlloc(s.utf8.count)
-        value = s
+        value = try reader.readString(budget: &budget)
     }
     mutating func decodeSingularStringField(value: inout String?) throws {
         guard try expectOrSkip(WireType.wireString) else { return }
-        let s = try reader.readString()
-        try budget.addAlloc(s.utf8.count)
-        value = s
+        value = try reader.readString(budget: &budget)
     }
 
     mutating func decodeSingularBytesField(value: inout Data) throws {
@@ -924,9 +944,7 @@ private struct OmniBufSwiftDecoder: SwiftProtobuf.Decoder {
         try decodeArray(expectedElemWT: WireType.wireString, elemAllocBytes: MemoryLayout<String>.stride) { er, cnt, b in
             try Self.safeReserve(&value, additional: cnt)
             for _ in 0..<cnt {
-                let s = try er.readString()
-                try b.addAlloc(s.utf8.count)
-                value.append(s)
+                value.append(try er.readString(budget: &b))
             }
         }
     }
@@ -1109,9 +1127,7 @@ private func readMapScalar<FT: SwiftProtobuf.FieldType>(
     case is ProtobufDouble.Type:
         return (try r.readFloat64()) as! FT.BaseType
     case is ProtobufString.Type:
-        let s = try r.readString()
-        try budget.addAlloc(s.utf8.count)
-        return s as! FT.BaseType
+        return (try r.readString(budget: &budget)) as! FT.BaseType
     case is ProtobufBytes.Type:
         let slice = try r.readLenSlice()
         try budget.addAlloc(slice.count)
