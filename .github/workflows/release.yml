@@ -18,6 +18,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
+      - name: Import Swift GPG signing key
+        if: runner.os == 'Linux'
+        run: |
+          gpg --batch --keyserver hkps://keyserver.ubuntu.com --recv-keys E813C892820A6FA13755B268F167DF1ACF9CE069 || \
+          gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys E813C892820A6FA13755B268F167DF1ACF9CE069
+
       - name: Setup Swift
         uses: swift-actions/setup-swift@v3
         with:
@@ -62,6 +68,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
+
+      - name: Import Swift GPG signing key
+        if: runner.os == 'Linux'
+        run: |
+          gpg --batch --keyserver hkps://keyserver.ubuntu.com --recv-keys E813C892820A6FA13755B268F167DF1ACF9CE069 || \
+          gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys E813C892820A6FA13755B268F167DF1ACF9CE069
 
       - name: Setup Swift
         uses: swift-actions/setup-swift@v3
