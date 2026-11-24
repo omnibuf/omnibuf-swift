@@ -357,7 +357,7 @@ public struct OmniBufWriter: ~Copyable {
     }
 }
 
-/// Compares two strings in unsigned UTF-8 byte order (per OmniBuf v0.1 deterministic map sorting).
+/// Compares two strings in unsigned UTF-8 byte order (per OmniBuf v1 DRAFT-1 deterministic map sorting).
 @inlinable
 public func compareUTF8Bytes(_ a: String, _ b: String) -> Bool {
     a.utf8.lexicographicallyPrecedes(b.utf8)

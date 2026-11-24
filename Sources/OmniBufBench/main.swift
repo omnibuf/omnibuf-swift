@@ -1,5 +1,6 @@
 import Foundation
 import OmniBuf
+import OmniBufGenerated
 import SwiftProtobuf
 
 // MARK: - Benchmark Report JSON Schema

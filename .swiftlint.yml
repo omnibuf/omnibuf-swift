@@ -1,0 +1,27 @@
+included:
+  - Sources
+  - Tests
+
+excluded:
+  - .build
+  - Sources/OmniBufGenerated
+
+disabled_rules:
+  - cyclomatic_complexity
+  - file_length
+  - function_body_length
+  - identifier_name
+  - large_tuple
+  - line_length
+  - nesting
+  - redundant_optional_initialization
+  - type_body_length
+  - trailing_comma
+
+opt_in_rules:
+  - empty_count
+  - empty_string
+  - sorted_imports
+
+analyzer_rules:
+  - unused_import

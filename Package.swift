@@ -29,10 +29,7 @@ let package = Package(
     targets: [
         .target(
             name: "OmniBuf",
-            dependencies: [],
-            swiftSettings: [
-                .enableExperimentalFeature("StrictConcurrency"),
-            ]
+            dependencies: []
         ),
         .target(
             name: "OmniBufProtobuf",
@@ -41,9 +38,23 @@ let package = Package(
                 .product(name: "SwiftProtobuf", package: "swift-protobuf"),
             ]
         ),
+        .target(
+            name: "OmniBufCodeGen",
+            dependencies: [
+                .product(name: "SwiftProtobuf", package: "swift-protobuf"),
+                .product(name: "SwiftProtobufPluginLibrary", package: "swift-protobuf"),
+            ]
+        ),
+        .target(
+            name: "OmniBufGenerated",
+            dependencies: [
+                "OmniBuf",
+            ]
+        ),
         .executableTarget(
             name: "protoc-gen-omnibuf-swift",
             dependencies: [
+                "OmniBufCodeGen",
                 .product(name: "SwiftProtobuf", package: "swift-protobuf"),
                 .product(name: "SwiftProtobufPluginLibrary", package: "swift-protobuf"),
             ]
@@ -52,6 +63,7 @@ let package = Package(
             name: "conformance-swift",
             dependencies: [
                 "OmniBuf",
+                "OmniBufGenerated",
                 "OmniBufProtobuf",
                 .product(name: "SwiftProtobuf", package: "swift-protobuf"),
             ]
@@ -60,6 +72,7 @@ let package = Package(
             name: "OmniBufBench",
             dependencies: [
                 "OmniBuf",
+                "OmniBufGenerated",
                 "OmniBufProtobuf",
                 .product(name: "SwiftProtobuf", package: "swift-protobuf"),
             ]
@@ -68,8 +81,8 @@ let package = Package(
             name: "OmniBufTests",
             dependencies: [
                 "OmniBuf",
+                "OmniBufCodeGen",
                 "OmniBufProtobuf",
-                "protoc-gen-omnibuf-swift",
                 .product(name: "SwiftProtobuf", package: "swift-protobuf"),
                 .product(name: "SwiftProtobufPluginLibrary", package: "swift-protobuf"),
             ]

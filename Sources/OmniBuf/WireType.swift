@@ -1,4 +1,4 @@
-/// OmniBuf v0.1 4-bit wire type codes and protocol constants.
+/// OmniBuf v1 DRAFT-1 4-bit wire type codes and protocol constants.
 public enum WireType: UInt8, Sendable, Equatable, Hashable {
     case uint = 0
     case sint = 1

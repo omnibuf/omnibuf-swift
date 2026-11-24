@@ -1,17 +1,10 @@
 # omnibuf-swift
 
-Swift 6 implementation of the [OmniBuf v0.1](https://omnibuf.com/spec) binary wire format.
+[![OmniBuf Spec: v1 DRAFT-1](https://img.shields.io/badge/OmniBuf%20Spec-v1%20DRAFT--1-FF4F18)](https://omnibuf.com/spec)
 
-## Features
+Swift 6 implementation of the [OmniBuf v1 DRAFT-1 wire format](https://omnibuf.com/spec). Documentation and benchmarks live at [omnibuf.com/swift](https://omnibuf.com/swift).
 
-- **Zero-dependency core (`OmniBuf`)**: Pure Swift standard library wire reader, single-pass backpatching writer, strict UTF-8 validator, Field #0 `SchemaMeta`, lazy `Opaque` scanners, in-place wire splicing, declarative `OmniBufStruct` schemas, and schema-less `decodeBlind` / `decodeBlindJSON`.
-- **Tier 1 (`protoc-gen-omnibuf-swift`)**: Protobuf compiler plugin generating Swift structs, single-pass encoders/decoders, and zero-copy lazy `Opaque<Message>` views with wire splicing.
-- **Tier 2 (`OmniBufProtobuf`)**: Direct `SwiftProtobuf.Message` encoding and decoding via custom `SwiftProtobuf.Visitor` and `SwiftProtobuf.Decoder` implementations.
-- **Tier 3 (`OmniBufStruct`)**: Native Swift structs mapped with declarative `OmniBufStructSchema` key-path field codecs, including recursive types via `Indirect<T>`.
-- **Tier 4 (`decodeBlind`)**: Schema-less packet inspection to `BlindValue` trees and canonical JSON, resolving Field #0 `SchemaMeta` names or falling back to `field_<N>`.
-- **Cross-language conformance**: Passes all 992/992 test cases across all 4 tiers in `omnibuf-go`'s `conformance-runner`.
-
-## Installation
+## Install
 
 Add `omnibuf-swift` to `Package.swift`:
 
@@ -21,16 +14,14 @@ dependencies: [
 ]
 ```
 
-Depend on `"OmniBuf"` for the zero-dependency core, or `"OmniBufProtobuf"` to add `SwiftProtobuf.Message` support.
+Depend on the `OmniBuf` product for the zero-dependency core, or `OmniBufProtobuf` for `SwiftProtobuf` interop.
 
-## Quick Start
-
-### Declarative Swift Structs (Tier 3)
+## Quick usage
 
 ```swift
 import OmniBuf
 
-struct Location: OmniBufStruct, Equatable {
+struct Location: OmniBufStruct, Sendable, Equatable {
     var city: String = ""
     var rack: UInt32 = 0
 
@@ -43,52 +34,18 @@ struct Location: OmniBufStruct, Equatable {
     )
 }
 
-let bytes = try Location(city: "FRA", rack: 42).encodeOmniBuf()
-let decoded = try Location.decoded(from: bytes)
+let wire = try Location(city: "FRA", rack: 42).encodeOmniBuf()
+let decoded = try Location.decoded(from: wire)
 ```
 
-### Schema-less Inspection (Tier 4)
+## Details
 
-```swift
-import OmniBuf
-
-let json = try decodeBlindJSON(bytes)
-// {"field_3":"FRA","field_4":42}
-```
-
-### Code Generation (`protoc-gen-omnibuf-swift`)
-
-```bash
-swift build -c release --product protoc-gen-omnibuf-swift
-protoc \
-  --plugin=protoc-gen-omnibuf-swift=.build/release/protoc-gen-omnibuf-swift \
-  --omnibuf-swift_out=./Generated \
-  -I proto proto/omnibuf/bench/peer.proto
-```
-
-### Lazy Zero-Decode Views & Wire Splicing
-
-```swift
-var view = OpaquePeerUpdate(packet)
-let city = view.getLocation().getCity()
-view.setSequence(view.getSequence() + 1)
-let updatedPacket = view.marshal()
-```
-
-## Benchmarks
-
-Swift benchmark results, methodology, and cross-language comparisons live at [omnibuf.com/benchmarks?lang=swift](https://omnibuf.com/benchmarks?lang=swift) (all languages at [omnibuf.com/benchmarks](https://omnibuf.com/benchmarks)). Run `just bench` locally to regenerate [`testdata/benchmarks.json`](testdata/benchmarks.json).
-
-## Development
-
-```bash
-just build         # Debug build
-just build-release # Release build
-just test          # Swift unit tests
-just conformance   # Run 992-case cross-language conformance suite
-just bench         # Run 6-category PeerUpdate benchmark suite -> testdata/benchmarks.json
-```
+- Built for Swift 6 strict concurrency with `Sendable` structs and a zero-dependency `OmniBuf` core module.
+- `OmniBufStruct` maps native Swift structs through declarative `OmniBufStructSchema` key-path codecs, with `Indirect<T>` for recursive types.
+- `OmniBufProtobuf` encodes and decodes `SwiftProtobuf.Message` values via custom `SwiftProtobuf.Visitor` and `SwiftProtobuf.Decoder` implementations.
+- `protoc-gen-omnibuf-swift` generates Swift structs, single-pass encoders/decoders, and lazy `Opaque*` views with wire splicing.
+- `decodeBlind` and `decodeBlindJSON` inspect arbitrary packets and resolve inline `Field #0` schema metadata.
 
 ## License
 
-Apache License 2.0. See [LICENSE](LICENSE).
+Apache-2.0. See [LICENSE](./LICENSE).

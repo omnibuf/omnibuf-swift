@@ -148,21 +148,21 @@ extension Indirect: Hashable where T: Hashable {
 // MARK: - Tier 3: Declarative Schema Mapping for Native Swift Structs
 
 /// A single typed field codec binding a Swift struct property to an OmniBuf field number.
-public struct OmniBufFieldCodec<Root: Sendable>: @unchecked Sendable {
+public struct OmniBufFieldCodec<Root: Sendable>: Sendable {
     public let fieldNumber: UInt32
     public let name: String
-    public let childMeta: ((Set<String>) -> SchemaMeta)?
-    public let instanceChildMeta: ((Root, Int, Int) -> SchemaMeta?)?
-    public let encode: (Root, inout OmniBufWriter, EncodeOptions) throws -> Void
-    public let decode: (inout Root, inout OmniBufReader, UInt8, Int, inout DecodeBudget) throws -> Void
+    public let childMeta: (@Sendable (Set<String>) -> SchemaMeta)?
+    public let instanceChildMeta: (@Sendable (Root, Int, Int) -> SchemaMeta?)?
+    public let encode: @Sendable (Root, inout OmniBufWriter, EncodeOptions) throws -> Void
+    public let decode: @Sendable (inout Root, inout OmniBufReader, UInt8, Int, inout DecodeBudget) throws -> Void
 
     public init(
         fieldNumber: UInt32,
         name: String,
-        childMeta: ((Set<String>) -> SchemaMeta)? = nil,
-        instanceChildMeta: ((Root, Int, Int) -> SchemaMeta?)? = nil,
-        encode: @escaping (Root, inout OmniBufWriter, EncodeOptions) throws -> Void,
-        decode: @escaping (inout Root, inout OmniBufReader, UInt8, Int, inout DecodeBudget) throws -> Void
+        childMeta: (@Sendable (Set<String>) -> SchemaMeta)? = nil,
+        instanceChildMeta: (@Sendable (Root, Int, Int) -> SchemaMeta?)? = nil,
+        encode: @escaping @Sendable (Root, inout OmniBufWriter, EncodeOptions) throws -> Void,
+        decode: @escaping @Sendable (inout Root, inout OmniBufReader, UInt8, Int, inout DecodeBudget) throws -> Void
     ) {
         self.fieldNumber = fieldNumber
         self.name = name
@@ -207,7 +207,7 @@ extension OmniBufStruct {
 }
 
 /// Runtime-compiled declarative schema for a Swift struct.
-public final class OmniBufStructSchema<Root: Sendable>: @unchecked Sendable {
+public final class OmniBufStructSchema<Root: Sendable>: Sendable {
     public let typeName: String
     public let fields: [OmniBufFieldCodec<Root>]
     private let byFieldNumber: [UInt32: OmniBufFieldCodec<Root>]
@@ -299,7 +299,7 @@ public final class OmniBufStructSchema<Root: Sendable>: @unchecked Sendable {
 
 public enum Field {
     public static func uint32<Root: Sendable>(
-        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, UInt32>
+        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, UInt32> & Sendable
     ) -> OmniBufFieldCodec<Root> {
         OmniBufFieldCodec(
             fieldNumber: id,
@@ -322,7 +322,7 @@ public enum Field {
     }
 
     public static func uint64<Root: Sendable>(
-        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, UInt64>
+        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, UInt64> & Sendable
     ) -> OmniBufFieldCodec<Root> {
         OmniBufFieldCodec(
             fieldNumber: id,
@@ -345,7 +345,7 @@ public enum Field {
     }
 
     public static func sint32<Root: Sendable>(
-        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, Int32>
+        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, Int32> & Sendable
     ) -> OmniBufFieldCodec<Root> {
         OmniBufFieldCodec(
             fieldNumber: id,
@@ -368,7 +368,7 @@ public enum Field {
     }
 
     public static func sint64<Root: Sendable>(
-        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, Int64>
+        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, Int64> & Sendable
     ) -> OmniBufFieldCodec<Root> {
         OmniBufFieldCodec(
             fieldNumber: id,
@@ -391,7 +391,7 @@ public enum Field {
     }
 
     public static func bool<Root: Sendable>(
-        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, Bool>
+        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, Bool> & Sendable
     ) -> OmniBufFieldCodec<Root> {
         OmniBufFieldCodec(
             fieldNumber: id,
@@ -414,7 +414,7 @@ public enum Field {
     }
 
     public static func fixed32<Root: Sendable>(
-        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, UInt32>
+        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, UInt32> & Sendable
     ) -> OmniBufFieldCodec<Root> {
         OmniBufFieldCodec(
             fieldNumber: id,
@@ -437,7 +437,7 @@ public enum Field {
     }
 
     public static func fixed64<Root: Sendable>(
-        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, UInt64>
+        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, UInt64> & Sendable
     ) -> OmniBufFieldCodec<Root> {
         OmniBufFieldCodec(
             fieldNumber: id,
@@ -460,7 +460,7 @@ public enum Field {
     }
 
     public static func sfixed32<Root: Sendable>(
-        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, Int32>
+        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, Int32> & Sendable
     ) -> OmniBufFieldCodec<Root> {
         OmniBufFieldCodec(
             fieldNumber: id,
@@ -483,7 +483,7 @@ public enum Field {
     }
 
     public static func sfixed64<Root: Sendable>(
-        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, Int64>
+        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, Int64> & Sendable
     ) -> OmniBufFieldCodec<Root> {
         OmniBufFieldCodec(
             fieldNumber: id,
@@ -506,7 +506,7 @@ public enum Field {
     }
 
     public static func float32<Root: Sendable>(
-        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, Float>
+        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, Float> & Sendable
     ) -> OmniBufFieldCodec<Root> {
         OmniBufFieldCodec(
             fieldNumber: id,
@@ -529,7 +529,7 @@ public enum Field {
     }
 
     public static func float64<Root: Sendable>(
-        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, Double>
+        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, Double> & Sendable
     ) -> OmniBufFieldCodec<Root> {
         OmniBufFieldCodec(
             fieldNumber: id,
@@ -552,7 +552,7 @@ public enum Field {
     }
 
     public static func string<Root: Sendable>(
-        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, String>
+        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, String> & Sendable
     ) -> OmniBufFieldCodec<Root> {
         OmniBufFieldCodec(
             fieldNumber: id,
@@ -575,7 +575,7 @@ public enum Field {
     }
 
     public static func bytes<Root: Sendable>(
-        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, [UInt8]>
+        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, [UInt8]> & Sendable
     ) -> OmniBufFieldCodec<Root> {
         OmniBufFieldCodec(
             fieldNumber: id,
@@ -598,7 +598,7 @@ public enum Field {
     }
 
     public static func message<Root: Sendable, Child: OmniBufMessage>(
-        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, Child?>
+        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, Child?> & Sendable
     ) -> OmniBufFieldCodec<Root> {
         OmniBufFieldCodec(
             fieldNumber: id,
@@ -638,7 +638,7 @@ public enum Field {
     }
 
     public static func indirectMessage<Root: Sendable, Child: OmniBufMessage>(
-        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, Indirect<Child>?>
+        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, Indirect<Child>?> & Sendable
     ) -> OmniBufFieldCodec<Root> {
         OmniBufFieldCodec(
             fieldNumber: id,
@@ -678,7 +678,7 @@ public enum Field {
     }
 
     public static func stringArray<Root: Sendable>(
-        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, [String]>
+        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, [String]> & Sendable
     ) -> OmniBufFieldCodec<Root> {
         OmniBufFieldCodec(
             fieldNumber: id,
@@ -729,7 +729,7 @@ public enum Field {
     }
 
     public static func uint32Array<Root: Sendable>(
-        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, [UInt32]>
+        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, [UInt32]> & Sendable
     ) -> OmniBufFieldCodec<Root> {
         OmniBufFieldCodec(
             fieldNumber: id,
@@ -779,7 +779,7 @@ public enum Field {
     }
 
     public static func messageArray<Root: Sendable, Child: OmniBufMessage>(
-        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, [Child]>, omitEmpty: Bool = true
+        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, [Child]> & Sendable, omitEmpty: Bool = true
     ) -> OmniBufFieldCodec<Root> {
         OmniBufFieldCodec(
             fieldNumber: id,
@@ -853,7 +853,7 @@ public enum Field {
     }
 
     public static func mapStringUint64<Root: Sendable>(
-        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, [String: UInt64]>, omitEmpty: Bool = true
+        _ id: UInt32, _ name: String, _ kp: WritableKeyPath<Root, [String: UInt64]> & Sendable, omitEmpty: Bool = true
     ) -> OmniBufFieldCodec<Root> {
         OmniBufFieldCodec(
             fieldNumber: id,
