@@ -14,7 +14,7 @@ dependencies: [
 ]
 ```
 
-Depend on the `OmniBuf` product for the zero-dependency core, or `OmniBufProtobuf` for `SwiftProtobuf` interop.
+Depend on the `OmniBuf` product for the zero-dependency core, `OmniBufGRPC` for gRPC serializers, `OmniBufConnect` for Connect codecs, or `OmniBufProtobuf` for `SwiftProtobuf` interop.
 
 ## Quick usage
 
@@ -36,6 +36,31 @@ struct Location: OmniBufStruct, Sendable, Equatable {
 
 let wire = try Location(city: "FRA", rack: 42).encodeOmniBuf()
 let decoded = try Location.decoded(from: wire)
+```
+
+## gRPC-Swift
+
+Import the detached `OmniBufGRPC` product to wire `OmniBufMessage` serializers and deserializers into `grpc-swift` without pulling gRPC into core `OmniBuf`.
+
+```swift
+import OmniBufGRPC
+
+let serializer = OmniBufGRPCSerializer<Location>.compact // codec name: "omnibuf"
+let deserializer = OmniBufGRPCDeserializer<Location>.default
+let payload = try serializer.serialize(Location(city: "FRA", rack: 42))
+let decoded = try deserializer.deserialize(payload)
+```
+
+## Connect-Swift
+
+Import the separate `OmniBufConnect` product for `connect-swift` codecs.
+
+```swift
+import OmniBufConnect
+
+let codec = OmniBufConnectCodec.compact // or .selfDescribing for "x-omnibuf"
+let payload = try codec.serialize(message: Location(city: "FRA", rack: 42))
+let decoded: Location = try codec.deserialize(source: payload)
 ```
 
 ## Details

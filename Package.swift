@@ -18,6 +18,14 @@ let package = Package(
             name: "OmniBufProtobuf",
             targets: ["OmniBufProtobuf"]
         ),
+        .library(
+            name: "OmniBufGRPC",
+            targets: ["OmniBufGRPC"]
+        ),
+        .library(
+            name: "OmniBufConnect",
+            targets: ["OmniBufConnect"]
+        ),
         .executable(
             name: "protoc-gen-omnibuf-swift",
             targets: ["protoc-gen-omnibuf-swift"]
@@ -30,6 +38,18 @@ let package = Package(
         .target(
             name: "OmniBuf",
             dependencies: []
+        ),
+        .target(
+            name: "OmniBufGRPC",
+            dependencies: [
+                "OmniBuf",
+            ]
+        ),
+        .target(
+            name: "OmniBufConnect",
+            dependencies: [
+                "OmniBuf",
+            ]
         ),
         .target(
             name: "OmniBufProtobuf",
@@ -83,6 +103,8 @@ let package = Package(
                 "OmniBuf",
                 "OmniBufCodeGen",
                 "OmniBufProtobuf",
+                "OmniBufGRPC",
+                "OmniBufConnect",
                 .product(name: "SwiftProtobuf", package: "swift-protobuf"),
                 .product(name: "SwiftProtobufPluginLibrary", package: "swift-protobuf"),
             ]
