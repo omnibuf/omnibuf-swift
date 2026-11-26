@@ -3,6 +3,14 @@ import SwiftProtobufPluginLibrary
 extension OmniBufCodeGenerator {
     // MARK: - Naming & Cycle Helpers
 
+    func isEditionsFile(_ file: FileDescriptor) -> Bool {
+        Self.supportedEditionRange.contains(file.edition)
+    }
+
+    func isMessageField(_ field: FieldDescriptor) -> Bool {
+        field.type == .message || (isEditionsFile(field.file) && field.type == .group)
+    }
+
     func swiftTypeName(_ descriptor: Descriptor) -> String {
         var parts: [String] = [descriptor.name]
         var cur = descriptor.containingType
@@ -23,8 +31,12 @@ extension OmniBufCodeGenerator {
         return parts.reversed().joined(separator: "_")
     }
 
+    func swiftOneofEnumName(_ oneof: OneofDescriptor) -> String {
+        "OneOf_\(pascalCase(oneof.name))"
+    }
+
     func isCyclicSingularField(_ field: FieldDescriptor, in owner: Descriptor) -> Bool {
-        guard !field.isRepeated && !field.isMap && field.type == .message,
+        guard !field.isRepeated && !field.isMap && isMessageField(field),
               let target = field.messageType else {
             return false
         }
@@ -35,7 +47,7 @@ extension OmniBufCodeGenerator {
                 return true
             }
             guard visited.insert(cur.fullName).inserted else { continue }
-            for f in cur.fields where !f.isRepeated && !f.isMap && f.type == .message {
+            for f in cur.fields where !f.isRepeated && !f.isMap && isMessageField(f) {
                 if let next = f.messageType {
                     stack.append(next)
                 }
@@ -89,6 +101,23 @@ extension OmniBufCodeGenerator {
 
     // MARK: - Field Type Mapping
 
+    /// Returns true for standalone singular non-message Editions fields with explicit presence (emitted as Optional).
+    func editionPresence(_ field: FieldDescriptor) -> Bool {
+        isEditionsFile(field.file)
+            && !field.isRepeated
+            && !isMessageField(field)
+            && field.realContainingOneof == nil
+            && field.hasPresence
+    }
+
+    func swiftOneofCasePayloadType(_ field: FieldDescriptor, in owner: Descriptor) -> String {
+        if isMessageField(field) {
+            let base = swiftTypeName(field.messageType!)
+            return isCyclicSingularField(field, in: owner) ? "Indirect<\(base)>" : base
+        }
+        return swiftSingularBaseType(field)
+    }
+
     func swiftFieldType(_ field: FieldDescriptor, in owner: Descriptor) -> String {
         if field.isMap {
             let entry = field.messageType!
@@ -100,15 +129,15 @@ extension OmniBufCodeGenerator {
         if field.isRepeated {
             return "[\(swiftSingularBaseType(field))]"
         }
-        if field.type == .message {
+        if isMessageField(field) {
             let base = swiftTypeName(field.messageType!)
             return isCyclicSingularField(field, in: owner) ? "Indirect<\(base)>?" : "\(base)?"
         }
-        return swiftSingularBaseType(field)
+        return swiftSingularBaseType(field) + (editionPresence(field) ? "?" : "")
     }
 
     func swiftSingularBaseType(_ field: FieldDescriptor) -> String {
-        if field.type == .message {
+        if isMessageField(field) {
             return swiftTypeName(field.messageType!)
         }
         if field.type == .enum {
@@ -133,10 +162,11 @@ extension OmniBufCodeGenerator {
     }
 
     func defaultValue(_ field: FieldDescriptor) -> String {
+        if editionPresence(field) { return "nil" }
         if field.isMap { return "[:]" }
         if field.isRepeated { return "[]" }
+        if isMessageField(field) { return "nil" }
         switch field.type {
-        case .message: return "nil"
         case .enum: return "\(swiftEnumName(field.enumType!))()"
         case .bool: return "false"
         case .string: return "\"\""
@@ -147,6 +177,7 @@ extension OmniBufCodeGenerator {
     }
 
     func wireTypeExpr(_ field: FieldDescriptor) -> String {
+        if isMessageField(field) { return "WireType.wireSubMsg" }
         switch field.type {
         case .uint32, .uint64: return "WireType.wireUint"
         case .int32, .int64, .sint32, .sint64, .enum: return "WireType.wireSint"
@@ -159,7 +190,6 @@ extension OmniBufCodeGenerator {
         case .double: return "WireType.wireFloat64"
         case .string: return "WireType.wireString"
         case .bytes: return "WireType.wireBytes"
-        case .message: return "WireType.wireSubMsg"
         default: return "WireType.wireUint"
         }
     }

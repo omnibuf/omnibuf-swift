@@ -321,3 +321,256 @@ struct PBTestAllTypes: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
         )
     }
 }
+
+// MARK: - Protobuf Editions 2023 / 2024 / 2026 Tier 2 Reference Models
+
+protocol PBEditionsTag: Sendable {
+    static var childProtoMessageName: String { get }
+    static var childTypeName: String { get }
+    static var payloadProtoMessageName: String { get }
+    static var payloadTypeName: String { get }
+}
+
+enum PBEditions2023Tag: PBEditionsTag {
+    static let childProtoMessageName = "omnibuf.conformance.Editions2023Child"
+    static let childTypeName = "Editions2023Child"
+    static let payloadProtoMessageName = "omnibuf.conformance.TestEditions2023"
+    static let payloadTypeName = "TestEditions2023"
+}
+
+enum PBEditions2024Tag: PBEditionsTag {
+    static let childProtoMessageName = "omnibuf.conformance.Editions2024Child"
+    static let childTypeName = "Editions2024Child"
+    static let payloadProtoMessageName = "omnibuf.conformance.TestEditions2024"
+    static let payloadTypeName = "TestEditions2024"
+}
+
+enum PBEditions2026Tag: PBEditionsTag {
+    static let childProtoMessageName = "omnibuf.conformance.Editions2026Child"
+    static let childTypeName = "Editions2026Child"
+    static let payloadProtoMessageName = "omnibuf.conformance.TestEditions2026"
+    static let payloadTypeName = "TestEditions2026"
+}
+
+enum PBEditionsStatus: SwiftProtobuf.Enum, Equatable, Hashable, Sendable {
+    typealias RawValue = Int
+    case unspecified
+    case active
+    case paused
+    case UNRECOGNIZED(Int)
+
+    init() { self = .unspecified }
+
+    init?(rawValue: Int) {
+        switch rawValue {
+        case 0: self = .unspecified
+        case 1: self = .active
+        case 2: self = .paused
+        default: self = .UNRECOGNIZED(rawValue)
+        }
+    }
+
+    var rawValue: Int {
+        switch self {
+        case .unspecified: return 0
+        case .active: return 1
+        case .paused: return 2
+        case .UNRECOGNIZED(let v): return v
+        }
+    }
+}
+
+struct PBEditionsChild<Tag: PBEditionsTag>: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, @unchecked Sendable, Equatable, OmniBufSchemaMetaProviding {
+    static var protoMessageName: String { Tag.childProtoMessageName }
+
+    var _id: Int32? = nil
+    var _note: String? = nil
+    var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    init() {}
+
+    init(id: Int32? = nil, note: String? = nil) {
+        self._id = id
+        self._note = note
+    }
+
+    mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+        while let fieldNumber = try decoder.nextFieldNumber() {
+            switch fieldNumber {
+            case 1: try decoder.decodeSingularInt32Field(value: &self._id)
+            case 2: try decoder.decodeSingularStringField(value: &self._note)
+            default: break
+            }
+        }
+    }
+
+    func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+        if let v = self._id { try visitor.visitSingularInt32Field(value: v, fieldNumber: 1) }
+        if let v = self._note { try visitor.visitSingularStringField(value: v, fieldNumber: 2) }
+        try unknownFields.traverse(visitor: &visitor)
+    }
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs._id == rhs._id && lhs._note == rhs._note && lhs.unknownFields == rhs.unknownFields
+    }
+
+    static var omniBufSchemaMeta: SchemaMeta {
+        SchemaMeta(
+            typeName: Tag.childTypeName,
+            fields: [1: "id", 2: "note"]
+        )
+    }
+}
+
+struct PBTestEditions<Tag: PBEditionsTag>: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, @unchecked Sendable, Equatable, OmniBufSchemaMetaProviding {
+    static var protoMessageName: String { Tag.payloadProtoMessageName }
+
+    enum OneOf_Choice: Equatable, Sendable {
+        case choiceInt(Int32)
+        case choiceText(String)
+        case choiceFlag(Bool)
+        case choiceChild(PBEditionsChild<Tag>)
+    }
+
+    var _explicitInt: Int32? = nil
+    var _explicitBool: Bool? = nil
+    var _explicitString: String? = nil
+    var _explicitBytes: Data? = nil
+    var _explicitDouble: Double? = nil
+    var _status: PBEditionsStatus? = nil
+    var implicitCount: Int32 = 0
+    var implicitFlag: Bool = false
+    var _child: PBEditionsChild<Tag>? = nil
+    var _delimitedChild: PBEditionsChild<Tag>? = nil
+    var packedVals: [Int32] = []
+    var expandedVals: [Int32] = []
+    var scores: [String: Int32] = [:]
+    var choice: OneOf_Choice? = nil
+    var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    init() {}
+
+    mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+        while let fieldNumber = try decoder.nextFieldNumber() {
+            switch fieldNumber {
+            case 1: try decoder.decodeSingularInt32Field(value: &self._explicitInt)
+            case 2: try decoder.decodeSingularBoolField(value: &self._explicitBool)
+            case 3: try decoder.decodeSingularStringField(value: &self._explicitString)
+            case 4: try decoder.decodeSingularBytesField(value: &self._explicitBytes)
+            case 5: try decoder.decodeSingularDoubleField(value: &self._explicitDouble)
+            case 6: try decoder.decodeSingularEnumField(value: &self._status)
+            case 7: try decoder.decodeSingularInt32Field(value: &self.implicitCount)
+            case 8: try decoder.decodeSingularBoolField(value: &self.implicitFlag)
+            case 9: try decoder.decodeSingularMessageField(value: &self._child)
+            case 10: try decoder.decodeSingularGroupField(value: &self._delimitedChild)
+            case 11: try decoder.decodeRepeatedInt32Field(value: &self.packedVals)
+            case 12: try decoder.decodeRepeatedInt32Field(value: &self.expandedVals)
+            case 13:
+                try decoder.decodeMapField(
+                    fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString, SwiftProtobuf.ProtobufInt32>.self,
+                    value: &self.scores
+                )
+            case 14:
+                var v: Int32?
+                try decoder.decodeSingularInt32Field(value: &v)
+                if let v = v {
+                    if self.choice != nil { try decoder.handleConflictingOneOf() }
+                    self.choice = .choiceInt(v)
+                }
+            case 15:
+                var v: String?
+                try decoder.decodeSingularStringField(value: &v)
+                if let v = v {
+                    if self.choice != nil { try decoder.handleConflictingOneOf() }
+                    self.choice = .choiceText(v)
+                }
+            case 16:
+                var v: Bool?
+                try decoder.decodeSingularBoolField(value: &v)
+                if let v = v {
+                    if self.choice != nil { try decoder.handleConflictingOneOf() }
+                    self.choice = .choiceFlag(v)
+                }
+            case 17:
+                var v: PBEditionsChild<Tag>?
+                var hadOneofValue = false
+                if let current = self.choice {
+                    hadOneofValue = true
+                    if case .choiceChild(let m) = current { v = m }
+                }
+                try decoder.decodeSingularMessageField(value: &v)
+                if let v = v {
+                    if hadOneofValue { try decoder.handleConflictingOneOf() }
+                    self.choice = .choiceChild(v)
+                }
+            default: break
+            }
+        }
+    }
+
+    func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+        if let v = self._explicitInt { try visitor.visitSingularInt32Field(value: v, fieldNumber: 1) }
+        if let v = self._explicitBool { try visitor.visitSingularBoolField(value: v, fieldNumber: 2) }
+        if let v = self._explicitString { try visitor.visitSingularStringField(value: v, fieldNumber: 3) }
+        if let v = self._explicitBytes { try visitor.visitSingularBytesField(value: v, fieldNumber: 4) }
+        if let v = self._explicitDouble { try visitor.visitSingularDoubleField(value: v, fieldNumber: 5) }
+        if let v = self._status { try visitor.visitSingularEnumField(value: v, fieldNumber: 6) }
+        if self.implicitCount != 0 { try visitor.visitSingularInt32Field(value: self.implicitCount, fieldNumber: 7) }
+        if self.implicitFlag != false { try visitor.visitSingularBoolField(value: self.implicitFlag, fieldNumber: 8) }
+        if let v = self._child { try visitor.visitSingularMessageField(value: v, fieldNumber: 9) }
+        if let v = self._delimitedChild { try visitor.visitSingularGroupField(value: v, fieldNumber: 10) }
+        if !self.packedVals.isEmpty { try visitor.visitPackedInt32Field(value: self.packedVals, fieldNumber: 11) }
+        if !self.expandedVals.isEmpty { try visitor.visitRepeatedInt32Field(value: self.expandedVals, fieldNumber: 12) }
+        if !self.scores.isEmpty {
+            try visitor.visitMapField(
+                fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString, SwiftProtobuf.ProtobufInt32>.self,
+                value: self.scores,
+                fieldNumber: 13
+            )
+        }
+        switch self.choice {
+        case .choiceInt(let v)?: try visitor.visitSingularInt32Field(value: v, fieldNumber: 14)
+        case .choiceText(let v)?: try visitor.visitSingularStringField(value: v, fieldNumber: 15)
+        case .choiceFlag(let v)?: try visitor.visitSingularBoolField(value: v, fieldNumber: 16)
+        case .choiceChild(let v)?: try visitor.visitSingularMessageField(value: v, fieldNumber: 17)
+        case nil: break
+        }
+        try unknownFields.traverse(visitor: &visitor)
+    }
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs._explicitInt == rhs._explicitInt
+            && lhs._explicitBool == rhs._explicitBool
+            && lhs._explicitString == rhs._explicitString
+            && lhs._explicitBytes == rhs._explicitBytes
+            && lhs._explicitDouble == rhs._explicitDouble
+            && lhs._status == rhs._status
+            && lhs.implicitCount == rhs.implicitCount
+            && lhs.implicitFlag == rhs.implicitFlag
+            && lhs._child == rhs._child
+            && lhs._delimitedChild == rhs._delimitedChild
+            && lhs.packedVals == rhs.packedVals
+            && lhs.expandedVals == rhs.expandedVals
+            && lhs.scores == rhs.scores
+            && lhs.choice == rhs.choice
+            && lhs.unknownFields == rhs.unknownFields
+    }
+
+    static var omniBufSchemaMeta: SchemaMeta {
+        let childMeta = PBEditionsChild<Tag>.omniBufSchemaMeta
+        return SchemaMeta(
+            typeName: Tag.payloadTypeName,
+            fields: [
+                1: "explicit_int", 2: "explicit_bool", 3: "explicit_string", 4: "explicit_bytes",
+                5: "explicit_double", 6: "status", 7: "implicit_count", 8: "implicit_flag",
+                9: "child", 10: "delimited_child", 11: "packed_vals", 12: "expanded_vals",
+                13: "scores", 14: "choice_int", 15: "choice_text", 16: "choice_flag", 17: "choice_child",
+            ],
+            children: [9: childMeta, 10: childMeta, 17: childMeta]
+        )
+    }
+}
+
+typealias PBTestEditions2023 = PBTestEditions<PBEditions2023Tag>
+typealias PBTestEditions2024 = PBTestEditions<PBEditions2024Tag>
+typealias PBTestEditions2026 = PBTestEditions<PBEditions2026Tag>

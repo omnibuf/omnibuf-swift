@@ -393,8 +393,158 @@ private func handlePluginTier(_ req: IPCRequest) -> IPCResponse {
             return .serializeErr("\(error)")
         }
 
+    case "omnibuf.conformance.TestEditions2023":
+        var msg = TestEditions2023(
+            explicitInt: 999,
+            explicitBool: true,
+            explicitString: "stale",
+            explicitBytes: [0xFF],
+            explicitDouble: 99.5,
+            status: .editions2023StatusPaused,
+            implicitCount: 999,
+            implicitFlag: true,
+            child: Editions2023Child(id: 999, note: "stale"),
+            delimitedChild: Editions2023Child(id: 999, note: "stale"),
+            packedVals: [999],
+            expandedVals: [999],
+            scores: ["stale": 999],
+            choice: .choiceText("stale")
+        )
+        do {
+            try msg.decodeOmniBuf(from: req.omnibufPayload)
+        } catch {
+            return .parseErr("\(error)")
+        }
+        let op = OpaqueTestEditions2023(req.omnibufPayload)
+        let opChild = op.getChild()
+        let opDelim = op.getDelimitedChild()
+        if op.getExplicitInt() != msg.explicitInt
+            || op.getExplicitBool() != msg.explicitBool
+            || op.getExplicitString() != msg.explicitString
+            || op.getExplicitBytes() != msg.explicitBytes
+            || op.getExplicitDouble().map(float64CanonicalBits) != msg.explicitDouble.map(float64CanonicalBits)
+            || op.getStatus() != msg.status
+            || op.getImplicitCount() != msg.implicitCount
+            || op.getImplicitFlag() != msg.implicitFlag
+            || opChild.getId() != msg.child?.id
+            || opChild.getNote() != msg.child?.note
+            || opDelim.getId() != msg.delimitedChild?.id
+            || opDelim.getNote() != msg.delimitedChild?.note
+            || op.packedValsCount != msg.packedVals.count
+            || op.expandedValsCount != msg.expandedVals.count
+            || op.getChoice() != msg.choice
+        {
+            return .parseErr("opaque TestEditions2023 getter mismatch with decoded struct")
+        }
+        do {
+            let out = try msg.encodeOmniBuf(options: EncodeOptions(deterministic: true, selfDescribing: req.selfDescribing))
+            return .wire(out)
+        } catch {
+            return .serializeErr("\(error)")
+        }
+
+    case "omnibuf.conformance.TestEditions2024":
+        var msg = TestEditions2024(
+            explicitInt: 999,
+            explicitBool: true,
+            explicitString: "stale",
+            explicitBytes: [0xFF],
+            explicitDouble: 99.5,
+            status: .editions2024StatusPaused,
+            implicitCount: 999,
+            implicitFlag: true,
+            child: Editions2024Child(id: 999, note: "stale"),
+            delimitedChild: Editions2024Child(id: 999, note: "stale"),
+            packedVals: [999],
+            expandedVals: [999],
+            scores: ["stale": 999],
+            choice: .choiceText("stale")
+        )
+        do {
+            try msg.decodeOmniBuf(from: req.omnibufPayload)
+        } catch {
+            return .parseErr("\(error)")
+        }
+        let op = OpaqueTestEditions2024(req.omnibufPayload)
+        let opChild = op.getChild()
+        let opDelim = op.getDelimitedChild()
+        if op.getExplicitInt() != msg.explicitInt
+            || op.getExplicitBool() != msg.explicitBool
+            || op.getExplicitString() != msg.explicitString
+            || op.getExplicitBytes() != msg.explicitBytes
+            || op.getExplicitDouble().map(float64CanonicalBits) != msg.explicitDouble.map(float64CanonicalBits)
+            || op.getStatus() != msg.status
+            || op.getImplicitCount() != msg.implicitCount
+            || op.getImplicitFlag() != msg.implicitFlag
+            || opChild.getId() != msg.child?.id
+            || opChild.getNote() != msg.child?.note
+            || opDelim.getId() != msg.delimitedChild?.id
+            || opDelim.getNote() != msg.delimitedChild?.note
+            || op.packedValsCount != msg.packedVals.count
+            || op.expandedValsCount != msg.expandedVals.count
+            || op.getChoice() != msg.choice
+        {
+            return .parseErr("opaque TestEditions2024 getter mismatch with decoded struct")
+        }
+        do {
+            let out = try msg.encodeOmniBuf(options: EncodeOptions(deterministic: true, selfDescribing: req.selfDescribing))
+            return .wire(out)
+        } catch {
+            return .serializeErr("\(error)")
+        }
+
+    case "omnibuf.conformance.TestEditions2026":
+        var msg = TestEditions2026(
+            explicitInt: 999,
+            explicitBool: true,
+            explicitString: "stale",
+            explicitBytes: [0xFF],
+            explicitDouble: 99.5,
+            status: .editions2026StatusPaused,
+            implicitCount: 999,
+            implicitFlag: true,
+            child: Editions2026Child(id: 999, note: "stale"),
+            delimitedChild: Editions2026Child(id: 999, note: "stale"),
+            packedVals: [999],
+            expandedVals: [999],
+            scores: ["stale": 999],
+            choice: .choiceText("stale")
+        )
+        do {
+            try msg.decodeOmniBuf(from: req.omnibufPayload)
+        } catch {
+            return .parseErr("\(error)")
+        }
+        let op = OpaqueTestEditions2026(req.omnibufPayload)
+        let opChild = op.getChild()
+        let opDelim = op.getDelimitedChild()
+        if op.getExplicitInt() != msg.explicitInt
+            || op.getExplicitBool() != msg.explicitBool
+            || op.getExplicitString() != msg.explicitString
+            || op.getExplicitBytes() != msg.explicitBytes
+            || op.getExplicitDouble().map(float64CanonicalBits) != msg.explicitDouble.map(float64CanonicalBits)
+            || op.getStatus() != msg.status
+            || op.getImplicitCount() != msg.implicitCount
+            || op.getImplicitFlag() != msg.implicitFlag
+            || opChild.getId() != msg.child?.id
+            || opChild.getNote() != msg.child?.note
+            || opDelim.getId() != msg.delimitedChild?.id
+            || opDelim.getNote() != msg.delimitedChild?.note
+            || op.packedValsCount != msg.packedVals.count
+            || op.expandedValsCount != msg.expandedVals.count
+            || op.getChoice() != msg.choice
+        {
+            return .parseErr("opaque TestEditions2026 getter mismatch with decoded struct")
+        }
+        do {
+            let out = try msg.encodeOmniBuf(options: EncodeOptions(deterministic: true, selfDescribing: req.selfDescribing))
+            return .wire(out)
+        } catch {
+            return .serializeErr("\(error)")
+        }
+
     default:
-        return .skippedReason("plugin tier generated for PeerUpdate and TestAllTypes")
+        return .skippedReason("plugin tier generated for PeerUpdate, TestAllTypes, and Editions 2023/2024/2026")
     }
 }
 
@@ -461,8 +611,49 @@ private func handleProtobufTypesTier(_ req: IPCRequest) -> IPCResponse {
             return .serializeErr("\(error)")
         }
 
+    case "omnibuf.conformance.TestEditions2023":
+        return roundTripPBEditions(PBTestEditions2023.self, req: req, opts: opts)
+
+    case "omnibuf.conformance.TestEditions2024":
+        return roundTripPBEditions(PBTestEditions2024.self, req: req, opts: opts)
+
+    case "omnibuf.conformance.TestEditions2026":
+        return roundTripPBEditions(PBTestEditions2026.self, req: req, opts: opts)
+
     default:
-        return .skippedReason("protobuf types tier generated for PeerUpdate and TestAllTypes")
+        return .skippedReason("protobuf types tier generated for PeerUpdate, TestAllTypes, and Editions 2023/2024/2026")
+    }
+}
+
+private func roundTripPBEditions<Tag: PBEditionsTag>(
+    _ type: PBTestEditions<Tag>.Type,
+    req: IPCRequest,
+    opts: EncodeOptions
+) -> IPCResponse {
+    var msg = PBTestEditions<Tag>()
+    msg._explicitInt = 999
+    msg._explicitBool = true
+    msg._explicitString = "stale"
+    msg._explicitBytes = Data([0xFF])
+    msg._explicitDouble = 99.5
+    msg._status = .paused
+    msg.implicitCount = 999
+    msg.implicitFlag = true
+    msg._child = PBEditionsChild<Tag>(id: 999, note: "stale")
+    msg._delimitedChild = PBEditionsChild<Tag>(id: 999, note: "stale")
+    msg.packedVals = [999]
+    msg.expandedVals = [999]
+    msg.scores = ["stale": 999]
+    msg.choice = .choiceText("stale")
+    do {
+        try OmniBufProtobuf.decode(into: &msg, from: req.omnibufPayload)
+    } catch {
+        return .parseErr("\(error)")
+    }
+    do {
+        return .wire(try OmniBufProtobuf.encode(msg, options: opts))
+    } catch {
+        return .serializeErr("\(error)")
     }
 }
 

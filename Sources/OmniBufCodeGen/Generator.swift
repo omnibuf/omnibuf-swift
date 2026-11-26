@@ -3,7 +3,8 @@ import SwiftProtobufPluginLibrary
 
 /// Generates OmniBuf Swift source files from Protobuf `FileDescriptor`s.
 public struct OmniBufCodeGenerator: Sendable {
-    public static let supportedFeatures: [Google_Protobuf_Compiler_CodeGeneratorResponse.Feature] = []
+    public static let supportedFeatures: [Google_Protobuf_Compiler_CodeGeneratorResponse.Feature] = [.supportsEditions]
+    public static let supportedEditionRange: ClosedRange<Google_Protobuf_Edition> = .edition2023 ... .edition2026
 
     public init() {}
 
@@ -15,15 +16,17 @@ public struct OmniBufCodeGenerator: Sendable {
         return protoName + ".omnibuf.swift"
     }
 
-    /// Generates output pairs for a batch of `FileDescriptor`s.
-    public func generate(files: [FileDescriptor]) -> [(fileName: String, contents: String)] {
-        files.map { file in
-            (fileName: outputFileName(for: file.name), contents: generateFile(file))
+    /// Generates output pairs for a batch of `FileDescriptor`s after validating Editions constraints.
+    public func generate(files: [FileDescriptor]) throws -> [(fileName: String, contents: String)] {
+        try files.map { file in
+            (fileName: outputFileName(for: file.name), contents: try generateFile(file))
         }
     }
 
-    /// Generates the Swift source text for a single `FileDescriptor`.
-    public func generateFile(_ file: FileDescriptor) -> String {
+    /// Generates the Swift source text for a single `FileDescriptor` after validating Editions constraints.
+    public func generateFile(_ file: FileDescriptor) throws -> String {
+        try validateEditions(file)
+
         var out = ""
         out += "// DO NOT EDIT.\n"
         out += "// swift-format-ignore-file\n"

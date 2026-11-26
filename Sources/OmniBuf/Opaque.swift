@@ -208,6 +208,108 @@ public enum OpaqueWire {
         return out
     }
 
+    /// Scans `raw` and returns the field number of the last occurrence whose field number
+    /// and wire type match one of `candidates` (used for lazy `oneof` inspection).
+    @inlinable
+    public static func locateLastOneofField(
+        in raw: UnsafeBufferPointer<UInt8>,
+        candidates: [(fieldNumber: UInt32, expectedWireType: UInt8)]
+    ) -> UInt32? {
+        var r = OmniBufReader(raw)
+        var winningField: UInt32? = nil
+        while !r.isAtEnd {
+            guard let (fnum, wt) = try? r.readTag() else { return nil }
+            if fnum == 0 {
+                guard wt == WireType.wireSubMsg else { return nil }
+                guard (try? r.skipValue(wireType: wt)) != nil else { return nil }
+                continue
+            }
+            guard (try? r.skipValue(wireType: wt)) != nil else { return nil }
+            for cand in candidates where cand.fieldNumber == fnum {
+                let isBool = (cand.expectedWireType == WireType.wireBoolFalse || cand.expectedWireType == WireType.wireBoolTrue)
+                if isBool {
+                    if wt == WireType.wireBoolFalse || wt == WireType.wireBoolTrue {
+                        winningField = fnum
+                    }
+                } else if wt == cand.expectedWireType {
+                    winningField = fnum
+                }
+                break
+            }
+        }
+        return winningField
+    }
+
+    /// Locates the byte range `(start, end)` of a `WireSubMsg` branch inside a `oneof`,
+    /// resetting earlier occurrences whenever a different matching sibling branch appears on the wire.
+    @inlinable
+    public static func locateOneofSubMsgRange(
+        in raw: UnsafeBufferPointer<UInt8>,
+        fieldNumber targetField: UInt32,
+        candidates: [(fieldNumber: UInt32, expectedWireType: UInt8)]
+    ) -> (start: Int, end: Int, multiple: Bool)? {
+        var r = OmniBufReader(raw)
+        var firstStart = 0
+        var firstEnd = 0
+        var count = 0
+        while !r.isAtEnd {
+            guard let (fnum, wt) = try? r.readTag() else { return nil }
+            if fnum == targetField && wt == WireType.wireSubMsg {
+                guard let len = try? r.readVarint(), len <= UInt64(r.remaining) else { return nil }
+                let s = r.position
+                let e = s &+ Int(len)
+                r.position = e
+                if count == 0 {
+                    firstStart = s
+                    firstEnd = e
+                }
+                count &+= 1
+            } else {
+                guard (try? r.skipValue(wireType: wt)) != nil else { return nil }
+                for cand in candidates where cand.fieldNumber == fnum && cand.fieldNumber != targetField {
+                    let isBool = (cand.expectedWireType == WireType.wireBoolFalse || cand.expectedWireType == WireType.wireBoolTrue)
+                    if isBool ? (wt == WireType.wireBoolFalse || wt == WireType.wireBoolTrue) : (wt == cand.expectedWireType) {
+                        count = 0
+                    }
+                    break
+                }
+            }
+        }
+        guard count > 0 else { return nil }
+        return (firstStart, firstEnd, count > 1)
+    }
+
+    /// Collects and concatenates all active occurrences of a `WireSubMsg` field belonging to a `oneof`,
+    /// discarding earlier occurrences that were superseded by another sibling branch.
+    @inlinable
+    public static func readOneofSubMsgBytes(
+        in raw: UnsafeBufferPointer<UInt8>,
+        fieldNumber targetField: UInt32,
+        candidates: [(fieldNumber: UInt32, expectedWireType: UInt8)]
+    ) -> [UInt8] {
+        var r = OmniBufReader(raw)
+        var out: [UInt8] = []
+        while !r.isAtEnd {
+            guard let (fnum, wt) = try? r.readTag() else { return [] }
+            if fnum == targetField && wt == WireType.wireSubMsg {
+                guard let slice = try? r.readLenSlice() else { return [] }
+                if !slice.isEmpty {
+                    out.append(contentsOf: slice)
+                }
+            } else {
+                guard (try? r.skipValue(wireType: wt)) != nil else { return [] }
+                for cand in candidates where cand.fieldNumber == fnum && cand.fieldNumber != targetField {
+                    let isBool = (cand.expectedWireType == WireType.wireBoolFalse || cand.expectedWireType == WireType.wireBoolTrue)
+                    if isBool ? (wt == WireType.wireBoolFalse || wt == WireType.wireBoolTrue) : (wt == cand.expectedWireType) {
+                        out.removeAll(keepingCapacity: true)
+                    }
+                    break
+                }
+            }
+        }
+        return out
+    }
+
     /// Counts total elements across all `WireArray` occurrences of `fieldNumber`.
     @inlinable
     public static func arrayCount(

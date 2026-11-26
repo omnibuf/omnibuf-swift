@@ -15,7 +15,7 @@ struct CodeGenTests {
     @Test("Code generator handles recursive messages, nested type qualification, enums, and depth limits")
     func testCodegenRecursiveNestedEnumsAndDepthLimit() throws {
         // Must not falsely advertise proto3_optional
-        #expect(OmniBufCodeGenerator.supportedFeatures.isEmpty)
+        #expect(OmniBufCodeGenerator.supportedFeatures == [.supportsEditions])
 
         // Build a synthetic FileDescriptorProto containing:
         // - Top-level enum TopStatus
@@ -109,7 +109,7 @@ struct CodeGenTests {
 
         let descriptorSet = DescriptorSet(protos: [file])
         let generator = OmniBufCodeGenerator()
-        let outputs = generator.generate(files: descriptorSet.files)
+        let outputs = try generator.generate(files: descriptorSet.files)
 
         guard outputs.count == 1 else {
             Issue.record("expected 1 generated file, got \(outputs.count)")

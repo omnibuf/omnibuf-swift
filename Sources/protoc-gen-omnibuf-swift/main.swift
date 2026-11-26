@@ -12,6 +12,10 @@ struct OmniBufSwiftPlugin: CodeGenerator {
         OmniBufCodeGenerator.supportedFeatures
     }
 
+    var supportedEditionRange: ClosedRange<Google_Protobuf_Edition> {
+        OmniBufCodeGenerator.supportedEditionRange
+    }
+
     init() {}
 
     func generate(
@@ -21,7 +25,7 @@ struct OmniBufSwiftPlugin: CodeGenerator {
         generatorOutputs: any GeneratorOutputs
     ) throws {
         let generator = OmniBufCodeGenerator()
-        for output in generator.generate(files: files) {
+        for output in try generator.generate(files: files) {
             try generatorOutputs.add(fileName: output.fileName, contents: output.contents)
         }
     }

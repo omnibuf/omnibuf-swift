@@ -260,8 +260,12 @@ private struct OmniBufVisitor: SwiftProtobuf.Visitor {
         elemType: UInt8,
         count: Int,
         body: (inout OmniBufWriter) throws -> Void
-    ) rethrows {
+    ) throws {
         guard count > 0 else { return }
+        let arrDepth = depth &+ 1
+        guard arrDepth <= WireType.maxNestingDepth else {
+            throw OmniBufError.depthLimitExceeded(arrDepth)
+        }
         try write { w in
             w.appendTag(fieldNumber: UInt32(fieldNumber), wireType: WireType.wireArray)
             let lenPos = w.reserveLength2()
@@ -273,7 +277,7 @@ private struct OmniBufVisitor: SwiftProtobuf.Visitor {
     }
 
     mutating func visitRepeatedFloatField(value: [Float], fieldNumber: Int) throws {
-        writeArray(fieldNumber: fieldNumber, elemType: WireType.wireFloat32, count: value.count) { w in
+        try writeArray(fieldNumber: fieldNumber, elemType: WireType.wireFloat32, count: value.count) { w in
             for v in value { w.appendFloat32(v) }
         }
     }
@@ -282,7 +286,7 @@ private struct OmniBufVisitor: SwiftProtobuf.Visitor {
     }
 
     mutating func visitRepeatedDoubleField(value: [Double], fieldNumber: Int) throws {
-        writeArray(fieldNumber: fieldNumber, elemType: WireType.wireFloat64, count: value.count) { w in
+        try writeArray(fieldNumber: fieldNumber, elemType: WireType.wireFloat64, count: value.count) { w in
             for v in value { w.appendFloat64(v) }
         }
     }
@@ -291,7 +295,7 @@ private struct OmniBufVisitor: SwiftProtobuf.Visitor {
     }
 
     mutating func visitRepeatedInt32Field(value: [Int32], fieldNumber: Int) throws {
-        writeArray(fieldNumber: fieldNumber, elemType: WireType.wireSint, count: value.count) { w in
+        try writeArray(fieldNumber: fieldNumber, elemType: WireType.wireSint, count: value.count) { w in
             for v in value { w.appendZigZag32(v) }
         }
     }
@@ -300,7 +304,7 @@ private struct OmniBufVisitor: SwiftProtobuf.Visitor {
     }
 
     mutating func visitRepeatedInt64Field(value: [Int64], fieldNumber: Int) throws {
-        writeArray(fieldNumber: fieldNumber, elemType: WireType.wireSint, count: value.count) { w in
+        try writeArray(fieldNumber: fieldNumber, elemType: WireType.wireSint, count: value.count) { w in
             for v in value { w.appendZigZag(v) }
         }
     }
@@ -309,7 +313,7 @@ private struct OmniBufVisitor: SwiftProtobuf.Visitor {
     }
 
     mutating func visitRepeatedUInt32Field(value: [UInt32], fieldNumber: Int) throws {
-        writeArray(fieldNumber: fieldNumber, elemType: WireType.wireUint, count: value.count) { w in
+        try writeArray(fieldNumber: fieldNumber, elemType: WireType.wireUint, count: value.count) { w in
             for v in value { w.appendVarint(UInt64(v)) }
         }
     }
@@ -318,7 +322,7 @@ private struct OmniBufVisitor: SwiftProtobuf.Visitor {
     }
 
     mutating func visitRepeatedUInt64Field(value: [UInt64], fieldNumber: Int) throws {
-        writeArray(fieldNumber: fieldNumber, elemType: WireType.wireUint, count: value.count) { w in
+        try writeArray(fieldNumber: fieldNumber, elemType: WireType.wireUint, count: value.count) { w in
             for v in value { w.appendVarint(v) }
         }
     }
@@ -341,7 +345,7 @@ private struct OmniBufVisitor: SwiftProtobuf.Visitor {
     }
 
     mutating func visitRepeatedFixed32Field(value: [UInt32], fieldNumber: Int) throws {
-        writeArray(fieldNumber: fieldNumber, elemType: WireType.wireFixed32, count: value.count) { w in
+        try writeArray(fieldNumber: fieldNumber, elemType: WireType.wireFixed32, count: value.count) { w in
             for v in value { w.appendFixed32(v) }
         }
     }
@@ -350,7 +354,7 @@ private struct OmniBufVisitor: SwiftProtobuf.Visitor {
     }
 
     mutating func visitRepeatedFixed64Field(value: [UInt64], fieldNumber: Int) throws {
-        writeArray(fieldNumber: fieldNumber, elemType: WireType.wireFixed64, count: value.count) { w in
+        try writeArray(fieldNumber: fieldNumber, elemType: WireType.wireFixed64, count: value.count) { w in
             for v in value { w.appendFixed64(v) }
         }
     }
@@ -359,7 +363,7 @@ private struct OmniBufVisitor: SwiftProtobuf.Visitor {
     }
 
     mutating func visitRepeatedSFixed32Field(value: [Int32], fieldNumber: Int) throws {
-        writeArray(fieldNumber: fieldNumber, elemType: WireType.wireSfixed32, count: value.count) { w in
+        try writeArray(fieldNumber: fieldNumber, elemType: WireType.wireSfixed32, count: value.count) { w in
             for v in value { w.appendSfixed32(v) }
         }
     }
@@ -368,7 +372,7 @@ private struct OmniBufVisitor: SwiftProtobuf.Visitor {
     }
 
     mutating func visitRepeatedSFixed64Field(value: [Int64], fieldNumber: Int) throws {
-        writeArray(fieldNumber: fieldNumber, elemType: WireType.wireSfixed64, count: value.count) { w in
+        try writeArray(fieldNumber: fieldNumber, elemType: WireType.wireSfixed64, count: value.count) { w in
             for v in value { w.appendSfixed64(v) }
         }
     }
@@ -377,7 +381,7 @@ private struct OmniBufVisitor: SwiftProtobuf.Visitor {
     }
 
     mutating func visitRepeatedBoolField(value: [Bool], fieldNumber: Int) throws {
-        writeArray(fieldNumber: fieldNumber, elemType: WireType.wireBoolFalse, count: value.count) { w in
+        try writeArray(fieldNumber: fieldNumber, elemType: WireType.wireBoolFalse, count: value.count) { w in
             for v in value { w.appendByte(v ? 1 : 0) }
         }
     }
@@ -386,13 +390,13 @@ private struct OmniBufVisitor: SwiftProtobuf.Visitor {
     }
 
     mutating func visitRepeatedStringField(value: [String], fieldNumber: Int) throws {
-        writeArray(fieldNumber: fieldNumber, elemType: WireType.wireString, count: value.count) { w in
+        try writeArray(fieldNumber: fieldNumber, elemType: WireType.wireString, count: value.count) { w in
             for v in value { w.appendStringValue(v) }
         }
     }
 
     mutating func visitRepeatedBytesField(value: [Data], fieldNumber: Int) throws {
-        writeArray(fieldNumber: fieldNumber, elemType: WireType.wireBytes, count: value.count) { w in
+        try writeArray(fieldNumber: fieldNumber, elemType: WireType.wireBytes, count: value.count) { w in
             for v in value {
                 w.appendVarint(UInt64(v.count))
                 v.withUnsafeBytes { rawBuf in
@@ -405,7 +409,7 @@ private struct OmniBufVisitor: SwiftProtobuf.Visitor {
     }
 
     mutating func visitRepeatedEnumField<E: SwiftProtobuf.Enum>(value: [E], fieldNumber: Int) throws {
-        writeArray(fieldNumber: fieldNumber, elemType: WireType.wireSint, count: value.count) { w in
+        try writeArray(fieldNumber: fieldNumber, elemType: WireType.wireSint, count: value.count) { w in
             for v in value { w.appendZigZag(Int64(v.rawValue)) }
         }
     }
@@ -448,6 +452,10 @@ private struct OmniBufVisitor: SwiftProtobuf.Visitor {
         fieldNumber: Int
     ) throws {
         guard !value.isEmpty else { return }
+        let mapDepth = depth &+ 1
+        guard mapDepth <= WireType.maxNestingDepth else {
+            throw OmniBufError.depthLimitExceeded(mapDepth)
+        }
         let keyWT = try wireTypeForFieldType(KeyType.self)
         let valWT = try wireTypeForFieldType(ValueType.self)
         let det = options.deterministic
@@ -471,6 +479,10 @@ private struct OmniBufVisitor: SwiftProtobuf.Visitor {
         fieldNumber: Int
     ) throws where ValueType.RawValue == Int {
         guard !value.isEmpty else { return }
+        let mapDepth = depth &+ 1
+        guard mapDepth <= WireType.maxNestingDepth else {
+            throw OmniBufError.depthLimitExceeded(mapDepth)
+        }
         let keyWT = try wireTypeForFieldType(KeyType.self)
         let det = options.deterministic
         try write { w in

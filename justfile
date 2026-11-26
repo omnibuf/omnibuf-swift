@@ -12,7 +12,17 @@ build-release:
 
 # Run all Swift unit and integration tests
 test:
-    swift test
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ "$(uname -s)" == "Darwin" ]] && [[ "$(xcode-select -p 2>/dev/null || true)" == "/Library/Developer/CommandLineTools" ]] && [[ -d "/Library/Developer/CommandLineTools/Library/Developer/Frameworks/Testing.framework" ]]; then
+        exec swift test \
+            -Xswiftc -F/Library/Developer/CommandLineTools/Library/Developer/Frameworks \
+            -Xlinker -F/Library/Developer/CommandLineTools/Library/Developer/Frameworks \
+            -Xlinker -rpath -Xlinker /Library/Developer/CommandLineTools/Library/Developer/Frameworks \
+            -Xlinker -rpath -Xlinker /Library/Developer/CommandLineTools/Library/Developer/usr/lib
+    else
+        exec swift test
+    fi
 
 # Lint, verify, and generate Swift OmniBuf code from proto/ using protoc-gen-omnibuf-swift
 proto:
@@ -35,7 +45,7 @@ conformance:
     elif command -v conformance-runner >/dev/null 2>&1; then
         RUNNER="conformance-runner"
     elif command -v go >/dev/null 2>&1; then
-        exec go run github.com/omnibuf/omnibuf-go/cmd/conformance-runner@71dad83aadd7dc65401d662521d34cfaeb1011ab ./.build/release/conformance-swift
+        exec go run github.com/omnibuf/omnibuf-go/cmd/conformance-runner@v0.2.11 ./.build/release/conformance-swift
     else
         echo "conformance-runner binary not found; set CONFORMANCE_RUNNER or install conformance-runner" >&2
         exit 1

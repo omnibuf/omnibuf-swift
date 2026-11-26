@@ -49,8 +49,8 @@ jobs:
 
       - name: Install conformance-runner
         run: |
-          mise use -g go@1.25
-          GOBIN="$HOME/.local/bin" mise exec -- go install github.com/omnibuf/omnibuf-go/cmd/conformance-runner@71dad83aadd7dc65401d662521d34cfaeb1011ab
+          mise use -g go@1.27
+          GOBIN="$HOME/.local/bin" mise exec -- go install github.com/omnibuf/omnibuf-go/cmd/conformance-runner@v0.2.11
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Run Swift tests
