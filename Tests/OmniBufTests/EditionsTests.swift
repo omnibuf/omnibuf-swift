@@ -561,7 +561,7 @@ struct EditionsTests {
 
                 func check(_ cond: Bool, _ msg: String, line: UInt = #line) {
                     if !cond {
-                        fputs("FAIL line \\(line): \\(msg)\\n", stderr)
+                        FileHandle.standardError.write(Data("FAIL line \\(line): \\(msg)\\n".utf8))
                         exit(1)
                     }
                 }
@@ -845,7 +845,7 @@ struct EditionsTests {
 
                 func check(_ cond: Bool, _ msg: String, line: UInt = #line) {
                     if !cond {
-                        fputs("FAIL line \\(line): \\(msg)\\n", stderr)
+                        FileHandle.standardError.write(Data("FAIL line \\(line): \\(msg)\\n".utf8))
                         exit(1)
                     }
                 }
@@ -1006,7 +1006,7 @@ struct EditionsTests {
 
                 func check(_ cond: Bool, _ msg: String, line: UInt = #line) {
                     if !cond {
-                        fputs("FAIL line \\(line): \\(msg)\\n", stderr)
+                        FileHandle.standardError.write(Data("FAIL line \\(line): \\(msg)\\n".utf8))
                         exit(1)
                     }
                 }
