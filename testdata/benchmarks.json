@@ -8,27 +8,27 @@
           "baseline" : true,
           "highlight" : true,
           "name" : "OmniBuf (Generated)",
-          "nsPerOp" : 277,
-          "opsPerSec" : 3616238,
+          "nsPerOp" : 274,
+          "opsPerSec" : 3655091,
           "wireBytes" : 365
         },
         {
           "name" : "SwiftProtobuf",
-          "nsPerOp" : 1069,
-          "opsPerSec" : 935105,
+          "nsPerOp" : 1048,
+          "opsPerSec" : 954106,
           "wireBytes" : 341
         },
         {
           "highlight" : true,
           "name" : "OmniBuf (Struct Schema)",
-          "nsPerOp" : 2012,
-          "opsPerSec" : 497016,
+          "nsPerOp" : 2020,
+          "opsPerSec" : 495097,
           "wireBytes" : 365
         },
         {
           "name" : "JSONEncoder",
-          "nsPerOp" : 14648,
-          "opsPerSec" : 68270,
+          "nsPerOp" : 14550,
+          "opsPerSec" : 68730,
           "wireBytes" : 791
         }
       ],
@@ -42,24 +42,24 @@
           "baseline" : true,
           "highlight" : true,
           "name" : "OmniBuf (Generated)",
-          "nsPerOp" : 768,
-          "opsPerSec" : 1302855
+          "nsPerOp" : 785,
+          "opsPerSec" : 1273953
         },
         {
           "name" : "SwiftProtobuf",
-          "nsPerOp" : 1763,
-          "opsPerSec" : 567205
+          "nsPerOp" : 1805,
+          "opsPerSec" : 554125
         },
         {
           "highlight" : true,
           "name" : "OmniBuf (Struct Schema)",
-          "nsPerOp" : 4604,
-          "opsPerSec" : 217194
+          "nsPerOp" : 4413,
+          "opsPerSec" : 226592
         },
         {
           "name" : "JSONDecoder",
-          "nsPerOp" : 15960,
-          "opsPerSec" : 62656
+          "nsPerOp" : 15834,
+          "opsPerSec" : 63155
         }
       ],
       "title" : "Full Message Decode Speed",
@@ -73,17 +73,17 @@
           "highlight" : true,
           "name" : "OmniBuf (Generated)",
           "nsPerOp" : 117,
-          "opsPerSec" : 8540810
+          "opsPerSec" : 8579755
         },
         {
           "name" : "SwiftProtobuf",
-          "nsPerOp" : 1811,
-          "opsPerSec" : 552115
+          "nsPerOp" : 1819,
+          "opsPerSec" : 549660
         },
         {
           "name" : "JSONDecoder",
-          "nsPerOp" : 15909,
-          "opsPerSec" : 62858
+          "nsPerOp" : 15708,
+          "opsPerSec" : 63663
         }
       ],
       "title" : "Read a Single Nested Field",
@@ -96,18 +96,18 @@
           "baseline" : true,
           "highlight" : true,
           "name" : "OmniBuf (Generated)",
-          "nsPerOp" : 408,
-          "opsPerSec" : 2451137
+          "nsPerOp" : 405,
+          "opsPerSec" : 2466485
         },
         {
           "name" : "SwiftProtobuf",
-          "nsPerOp" : 2924,
-          "opsPerSec" : 341994
+          "nsPerOp" : 2920,
+          "opsPerSec" : 342485
         },
         {
           "name" : "JSONEncoder \/ JSONDecoder",
-          "nsPerOp" : 31351,
-          "opsPerSec" : 31897
+          "nsPerOp" : 30664,
+          "opsPerSec" : 32611
         }
       ],
       "title" : "Selective Single-Field Mutation",
@@ -120,27 +120,27 @@
           "baseline" : true,
           "highlight" : true,
           "name" : "OmniBuf (Generated)",
-          "nsPerOp" : 1814,
-          "opsPerSec" : 551420,
+          "nsPerOp" : 1706,
+          "opsPerSec" : 586319,
           "wireBytes" : 39255
         },
         {
           "name" : "SwiftProtobuf",
-          "nsPerOp" : 2605,
-          "opsPerSec" : 383867,
+          "nsPerOp" : 2532,
+          "opsPerSec" : 395019,
           "wireBytes" : 39227
         },
         {
           "highlight" : true,
           "name" : "OmniBuf (Struct Schema)",
-          "nsPerOp" : 5311,
-          "opsPerSec" : 188291,
+          "nsPerOp" : 5148,
+          "opsPerSec" : 194267,
           "wireBytes" : 39255
         },
         {
           "name" : "JSONEncoder",
-          "nsPerOp" : 92586,
-          "opsPerSec" : 10801,
+          "nsPerOp" : 90182,
+          "opsPerSec" : 11089,
           "wireBytes" : 39669
         }
       ],
@@ -154,18 +154,18 @@
           "baseline" : true,
           "highlight" : true,
           "name" : "OmniBuf (Generated)",
-          "nsPerOp" : 1175,
-          "opsPerSec" : 850734
+          "nsPerOp" : 1176,
+          "opsPerSec" : 850333
         },
         {
           "name" : "SwiftProtobuf",
-          "nsPerOp" : 13924,
-          "opsPerSec" : 71818
+          "nsPerOp" : 13692,
+          "opsPerSec" : 73038
         },
         {
           "name" : "JSONEncoder \/ JSONDecoder",
-          "nsPerOp" : 148326,
-          "opsPerSec" : 6742
+          "nsPerOp" : 144428,
+          "opsPerSec" : 6924
         }
       ],
       "title" : "Embedded Message Growth",
