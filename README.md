@@ -1,6 +1,9 @@
 # omnibuf-swift
 
+[![CI](https://github.com/omnibuf/omnibuf-swift/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/omnibuf/omnibuf-swift/actions/workflows/ci.yml?query=branch%3Amain)
 [![OmniBuf Spec: v1 DRAFT-1](https://img.shields.io/badge/OmniBuf%20Spec-v1%20DRAFT--1-FF4F18)](https://omnibuf.com/spec)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](./LICENSE)
+[![Website](https://img.shields.io/badge/website-omnibuf.com-111111?style=flat&labelColor=111111&color=D4FF33)](https://omnibuf.com/swift)
 
 Swift 6 implementation of the [OmniBuf v1 DRAFT-1 wire format](https://omnibuf.com/spec). Documentation and benchmarks live at [omnibuf.com/swift](https://omnibuf.com/swift).
 
